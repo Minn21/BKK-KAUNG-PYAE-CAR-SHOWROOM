@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import PhotoViewer from "../../components/PhotoViewer";
+import PhotoViewer from "@/app/components/PhotoViewer";
 
 export default function AddCar() {
   const router = useRouter();

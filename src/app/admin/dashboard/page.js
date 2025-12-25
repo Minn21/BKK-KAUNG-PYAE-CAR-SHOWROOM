@@ -13,12 +13,14 @@ export default function AdminDashboard() {
     customerName: "",
     passportNumber: "",
     phoneNumber: "",
+    email: "",
     carPrice: "",
     downPayment: "",
     monthlyPayment: "",
     installmentPeriod: "",
     purchasedDate: "",
-    carListNo: ""
+    carListNo: "",
+    carId: ""
   });
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -34,62 +36,123 @@ export default function AdminDashboard() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'installmentPeriod') {
+      console.log("Installment Period Input:", value, "Type:", typeof value);
+    }
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Create installment entry
-    const installmentData = {
-      id: Date.now(),
-      carModel: formData.carModel,
-      licensePlate: formData.licensePlate,
-      customerName: formData.customerName,
-      passportNumber: formData.passportNumber,
-      phoneNumber: formData.phoneNumber,
-      carPrice: formData.carPrice,
-      downPayment: formData.downPayment,
-      monthlyPayment: formData.monthlyPayment,
-      installmentPeriod: formData.installmentPeriod,
-      purchasedDate: formData.purchasedDate,
-      carListNo: formData.carListNo
-    };
+    if (!formData.carId) {
+      alert("Car ID is missing. Please try again.");
+      return;
+    }
 
-    // Save to localStorage
-    const existingInstallments = getInstallments();
-    const updatedInstallments = [...existingInstallments, installmentData];
-    localStorage.setItem('installments', JSON.stringify(updatedInstallments));
+    if (!API_BASE_URL) {
+      alert("API base URL is not configured.");
+      return;
+    }
 
-    // Remove car from car list since it's now in installments
-    const existingCars = JSON.parse(localStorage.getItem('cars') || '[]');
-    const updatedCars = existingCars.filter(car => 
-      car.licenseNo !== formData.licensePlate && car.carList !== formData.carListNo
-    );
-    localStorage.setItem('cars', JSON.stringify(updatedCars));
-    
-    // Update the cars state to reflect the removal
-    setCars(updatedCars);
+    try {
+      // Get token from localStorage for authentication
+      const token = localStorage.getItem('token');
+      
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-    alert("Installment added successfully! Car has been moved from car list to installment list.");
-    
-    setShowAddModal(false);
-    setFormData({
-      carModel: "",
-      licensePlate: "",
-      customerName: "",
-      passportNumber: "",
-      phoneNumber: "",
-      carPrice: "",
-      downPayment: "",
-      monthlyPayment: "",
-      installmentPeriod: "",
-      purchasedDate: "",
-      carListNo: ""
-    });
+      // Calculate remaining amount
+      const carPrice = parseFloat(formData.carPrice);
+      const downPayment = parseFloat(formData.downPayment);
+      const remainingAmount = carPrice - downPayment;
+
+      // Parse monthly payment to ensure correct value
+      const monthlyPayment = Number(formData.monthlyPayment);
+      console.log("Monthly Payment Input:", formData.monthlyPayment, "Parsed:", monthlyPayment);
+
+      // Parse installment period to ensure correct value
+      const installmentPeriod = Number(formData.installmentPeriod);
+      console.log("Installment Period Input:", formData.installmentPeriod, "Parsed:", installmentPeriod);
+
+      // Prepare installment data in the required format
+      const installmentData = {
+        installment: {
+          downPayment: downPayment,
+          remainingAmount: remainingAmount,
+          months: installmentPeriod,
+          startDate: formData.purchasedDate,
+          monthlyPayment: monthlyPayment,
+          buyer: {
+            name: formData.customerName,
+            passport: formData.passportNumber,
+            phone: formData.phoneNumber,
+            // email: formData.email || ""
+          }
+        }
+      };
+
+      console.log("installmentData",installmentData);
+
+      const response = await fetch(`${API_BASE_URL}/api/car/${formData.carId}/sell-installment`, {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify(installmentData),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert("Unauthorized: Please login again.");
+          return;
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Refresh the cars list to reflect the change
+      const tokenForRefresh = localStorage.getItem('token');
+      const refreshHeaders = {};
+      if (tokenForRefresh) {
+        refreshHeaders['Authorization'] = `Bearer ${tokenForRefresh}`;
+      }
+      
+      const carsResponse = await fetch(`${API_BASE_URL}/api/cars`, { 
+        cache: "no-store",
+        headers: refreshHeaders
+      });
+      
+      if (carsResponse.ok) {
+        const carsData = await carsResponse.json();
+        const apiCars = Array.isArray(carsData.data) ? carsData.data : [];
+        
+        const normalizedCars = apiCars.map((car, index) => ({
+          ...car,
+          id: car.id ?? car._id ?? index,
+          price: car.priceToSell,
+          wd: car.wheelDrive,
+        }));
+
+        const availableCars = normalizedCars.filter(car => car.isAvailable !== false);
+        setCars(availableCars);
+      }
+
+      // Redirect to installments page after successful submission
+      router.push('/admin/installments');
+    } catch (error) {
+      console.error("Failed to add installment:", error);
+      alert(`Failed to add installment: ${error.message}`);
+    }
   };
 
   const handleCancel = () => {
@@ -100,26 +163,42 @@ export default function AdminDashboard() {
       customerName: "",
       passportNumber: "",
       phoneNumber: "",
+      email: "",
       carPrice: "",
       downPayment: "",
       monthlyPayment: "",
       installmentPeriod: "",
       purchasedDate: "",
-      carListNo: ""
+      carListNo: "",
+      carId: ""
     });
   };
 
   const handleAddCarToInstallment = (car) => {
     // Check if car already exists in installments
-    const existingInstallments = getInstallments();
-    const carExists = existingInstallments.some(installment => 
-      installment.licensePlate === car.licenseNo || installment.carListNo === car.carList
-    );
+    // const existingInstallments = getInstallments();
+    // const carExists = existingInstallments.some(installment => 
+    //   installment.licensePlate === car.licenseNo || installment.carListNo === car.carList
+    // );
 
-    if (carExists) {
-      alert("This car is already in the installment list!");
-      return;
+    // if (carExists) {
+    //   alert("This car is already in the installment list!");
+    //   return;
+    // }
+
+    // Handle price - convert to string and remove currency formatting if needed
+    let carPrice = car.price;
+    if (typeof car.price === 'number') {
+      carPrice = car.price.toString();
+    } else if (typeof car.price === 'string') {
+      carPrice = car.price.replace('฿', '').replace(/,/g, '');
+    } else {
+      carPrice = '';
     }
+
+    // Format date as YYYY-MM-DD for HTML date input
+    const today = new Date();
+    const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     // Pre-fill form with car data
     setFormData({
@@ -128,12 +207,14 @@ export default function AdminDashboard() {
       customerName: "",
       passportNumber: "",
       phoneNumber: "",
-      carPrice: car.price.replace('฿', '').replace(',', ''), // Remove currency formatting
+      email: "",
+      carPrice: carPrice, // Remove currency formatting
       downPayment: "",
       monthlyPayment: "",
       installmentPeriod: "",
-      purchasedDate: new Date().toLocaleDateString('en-GB'),
-      carListNo: car.carList
+      purchasedDate: formattedDate,
+      carListNo: car.carList,
+      carId: car.id || car._id || ""
     });
     
     setShowAddModal(true);
@@ -506,6 +587,22 @@ export default function AdminDashboard() {
                     />
                   </div>
 
+                  {/* <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="e.g., customer@example.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-200 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      required
+                    />
+                  </div> */}
+
                   <div>
                     <label htmlFor="carPrice" className="block text-sm font-medium text-gray-700 mb-1">
                       Car Price
@@ -578,6 +675,8 @@ export default function AdminDashboard() {
                       value={formData.installmentPeriod}
                       onChange={handleInputChange}
                       placeholder="12"
+                      min="1"
+                      step="1"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-200 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                       required
                     />

@@ -4,47 +4,112 @@ import { useState, useEffect } from "react";
 
 export default function InstallmentsPage() {
   const [installments, setInstallments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   useEffect(() => {
-    // Load installments from localStorage
-    const loadInstallments = () => {
-      const savedInstallments = localStorage.getItem('installments');
-      const existingSoldCars = JSON.parse(localStorage.getItem('soldCars') || '[]');
-      
-      if (savedInstallments) {
-        const allInstallments = JSON.parse(savedInstallments);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const fetchInstallments = async () => {
+      if (!API_BASE_URL) {
+        console.warn("API base URL is not set. Skipping installment fetch.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
         
-        // Remove installments that are now in sold list
-        const filteredInstallments = allInstallments.filter(installment => 
-          !existingSoldCars.some(soldCar => soldCar.id === installment.id)
-        );
+        // Get token from localStorage for authentication
+        const token = localStorage.getItem('token');
         
-        // Update localStorage if installments were removed
-        if (filteredInstallments.length !== allInstallments.length) {
-          localStorage.setItem('installments', JSON.stringify(filteredInstallments));
+        const headers = {};
+        
+        // Add Authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
         }
         
-        setInstallments(filteredInstallments);
-      } else {
+        const response = await fetch(`${API_BASE_URL}/api/cars/sold/installment`, { 
+          cache: "no-store",
+          headers: headers
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.error("Unauthorized: Token is missing or invalid");
+            setInstallments([]);
+            setLoading(false);
+            return;
+          }
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const apiCars = Array.isArray(data.data) ? data.data : [];
+
+        if (!Array.isArray(apiCars)) {
+          console.warn("Unexpected response shape when fetching installments:", data);
+          setInstallments([]);
+          setLoading(false);
+          return;
+        }
+
+        // Normalize the API response to match expected format
+        const normalizedInstallments = apiCars.map((car, index) => {
+          // Get installment data
+          const installment = car.installment || {};
+          const buyer = installment.buyer || {};
+          
+          // Calculate total price (downPayment + remainingAmount)
+          const totalPrice = (installment.downPayment || 0) + (installment.remainingAmount || 0);
+          
+          // Calculate monthly payment (remainingAmount / months)
+          const months = installment.months || 0;
+          const remainingAmount = installment.remainingAmount || 0;
+          const monthlyPayment = months > 0 ? remainingAmount / months : 0;
+          
+          // Format start date
+          const startDate = installment.startDate 
+            ? new Date(installment.startDate).toLocaleDateString('en-GB')
+            : '';
+
+          const carId = car.id || car._id || index;
+          return {
+            id: carId,
+            licensePlate: car.licenseNo || '',
+            carModel: `${car.brand || ''} ${car.model || ''}`.trim(),
+            brand: car.brand || '',
+            model: car.model || '',
+            customerName: buyer.name || '',
+            passportNumber: buyer.passport || '',
+            phoneNumber: buyer.phone || '',
+            email: buyer.email || '',
+            carPrice: totalPrice,
+            downPayment: installment.downPayment || 0,
+            monthlyPayment: car.installmentMonthlyPayment,
+            installmentPeriod: months,
+            purchasedDate: startDate,
+            carListNo: car.carList || '',
+            // Include full car and installment data for details page
+            car: car,
+            installment: installment
+          };
+        });
+
+        setInstallments(normalizedInstallments);
+      } catch (error) {
+        console.error("Failed to fetch installments from API:", error);
         setInstallments([]);
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadInstallments();
-
-    // Listen for storage changes (when installments are added from other tabs or moved to sold list)
-    const handleStorageChange = (e) => {
-      if (e.key === 'installments' || e.key === 'soldCars') {
-        loadInstallments();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
+    fetchInstallments();
+  }, [API_BASE_URL]);
 
 
   const handleLogout = () => {
@@ -106,7 +171,7 @@ export default function InstallmentsPage() {
             <div>
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Installments Management</h2>
               <p className="text-white/70 text-sm mt-1">
-                {installments.length} installment{installments.length !== 1 ? 's' : ''} found
+                {loading ? 'Loading...' : `${installments.length} installment${installments.length !== 1 ? 's' : ''} found`}
               </p>
             </div>
           </div>
@@ -150,7 +215,13 @@ export default function InstallmentsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
-                  {installments.length > 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="10" className="px-6 py-12 text-center text-white/70">
+                        Loading installments...
+                      </td>
+                    </tr>
+                  ) : installments.length > 0 ? (
                     installments.map((installment, index) => (
                       <tr key={installment.id} className="hover:bg-black/30 backdrop-blur-2xl">
                         <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white cursor-pointer" onClick={() => window.location.href = `/admin/installment-details/${installment.id}`}>

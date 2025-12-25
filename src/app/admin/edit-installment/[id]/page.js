@@ -26,42 +26,99 @@ export default function EditInstallment() {
   const [ownerBookStatus, setOwnerBookStatus] = useState('pending');
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [penaltyFees, setPenaltyFees] = useState({});
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   useEffect(() => {
-    // Load installment data from localStorage
-    const savedInstallments = localStorage.getItem('installments');
-    
-    if (savedInstallments) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const fetchInstallmentData = async () => {
+      if (!API_BASE_URL) {
+        console.warn("API base URL is not set. Cannot fetch installment data.");
+        setLoading(false);
+        return;
+      }
+
       try {
-        const installments = JSON.parse(savedInstallments);
-        const foundInstallment = installments.find(inst => inst.id.toString() === installmentId);
+        setLoading(true);
         
-        if (foundInstallment) {
-          setFormData({
-            customerName: foundInstallment.customerName || "",
-            passportNumber: foundInstallment.passportNumber || "",
-            phoneNumber: foundInstallment.phoneNumber || "",
-            carPrice: foundInstallment.carPrice ? foundInstallment.carPrice.toString() : "",
-            downPayment: foundInstallment.downPayment ? foundInstallment.downPayment.toString() : "",
-            monthlyPayment: foundInstallment.monthlyPayment ? foundInstallment.monthlyPayment.toString() : "",
-            installmentPeriod: foundInstallment.installmentPeriod || "",
-            carModel: foundInstallment.carModel || "",
-            licensePlate: foundInstallment.licensePlate || "",
-            carListNo: foundInstallment.carListNo || "",
-            purchasedDate: foundInstallment.purchasedDate || ""
-          });
-          setLoading(false);
-        } else {
-          setLoading(false);
+        // Get token from localStorage for authentication
+        const token = localStorage.getItem('token');
+        
+        const headers = {};
+        
+        // Add Authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
         }
+        
+        // Fetch installment data from API
+        const response = await fetch(`${API_BASE_URL}/api/car/${installmentId}/installment`, {
+          cache: "no-store",
+          headers: headers
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            alert("Unauthorized: Please login again.");
+            router.push('/admin/login');
+            return;
+          }
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("Data",data);
+        const car = data.data || data;
+        const installment = car.installment || {};
+        const buyer = installment.buyer || {};
+        
+        // Calculate total price (downPayment + remainingAmount)
+        const totalPrice = (installment.downPayment || 0) + (installment.remainingAmount || 0);
+        
+        // Get monthly payment from car or calculate it
+        const months = installment.months || 0;
+        const remainingAmount = installment.remainingAmount || 0;
+        const monthlyPayment = car.installmentMonthlyPayment || (months > 0 ? remainingAmount / months : 0);
+        
+        // Convert date to YYYY-MM-DD format for date input
+        let formattedDate = "";
+        if (installment.startDate) {
+          try {
+            const date = new Date(installment.startDate);
+            if (!isNaN(date.getTime())) {
+              formattedDate = date.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.error("Error parsing date:", e);
+          }
+        }
+
+        setFormData({
+          customerName: buyer.name || "",
+          passportNumber: buyer.passport || "",
+          phoneNumber: buyer.phone || "",
+          carPrice: car.car.priceToSell.toString(),
+          downPayment: (installment.downPayment || 0).toString(),
+          monthlyPayment: installment.monthlyPayment.toString(),
+          installmentPeriod: installment.months.toString(),
+          carModel: `${car.car.brand || ''} ${car.car.model || ''}`.trim(),
+          licensePlate: car.car.licenseNo || "",
+          carListNo: car.carList || "",
+          purchasedDate: formattedDate
+        });
+        
+        setLoading(false);
       } catch (error) {
         console.error("Error loading installment data:", error);
+        alert(`Failed to load installment data: ${error.message}`);
         setLoading(false);
       }
-    } else {
-      setLoading(false);
-    }
-  }, [installmentId]);
+    };
+
+    fetchInstallmentData();
+  }, [installmentId, API_BASE_URL, router]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -71,34 +128,83 @@ export default function EditInstallment() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handlePenaltyFeeChange = (monthNumber, value) => {
+    setPenaltyFees(prev => ({
+      ...prev,
+      [monthNumber]: value ? Number(value) : 0
+    }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Create updated installment object
-    const updatedInstallment = {
-      id: parseInt(installmentId),
-      customerName: formData.customerName,
-      passportNumber: formData.passportNumber,
-      phoneNumber: formData.phoneNumber,
-      carPrice: parseInt(formData.carPrice) || 0,
-      downPayment: parseInt(formData.downPayment) || 0,
-      monthlyPayment: parseInt(formData.monthlyPayment) || 0,
-      installmentPeriod: formData.installmentPeriod,
-      carModel: formData.carModel,
-      licensePlate: formData.licensePlate,
-      carListNo: formData.carListNo,
-      purchasedDate: formData.purchasedDate
-    };
+    if (!API_BASE_URL) {
+      alert("API base URL is not configured.");
+      return;
+    }
 
-    // Update the installment in localStorage
-    const savedInstallments = JSON.parse(localStorage.getItem('installments') || '[]');
-    const updatedInstallments = savedInstallments.map(inst => 
-      inst.id.toString() === installmentId ? updatedInstallment : inst
-    );
-    localStorage.setItem('installments', JSON.stringify(updatedInstallments));
+    try {
+      // Get token from localStorage for authentication
+      const token = localStorage.getItem('token');
+      
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add Authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-    alert("Installment updated successfully!");
-    router.push(`/admin/installment-details/${installmentId}`);
+      // Calculate remaining amount
+      const carPrice = Number(formData.carPrice) || 0;
+      const downPayment = Number(formData.downPayment) || 0;
+      const remainingAmount = carPrice - downPayment;
+
+      // Parse monthly payment and installment period
+      const monthlyPayment = Number(formData.monthlyPayment);
+      const installmentPeriod = Number(formData.installmentPeriod);
+
+      // Prepare installment data in the required format
+      const installmentData = {
+        installment: {
+          downPayment: downPayment,
+          remainingAmount: remainingAmount,
+          months: installmentPeriod,
+          startDate: formData.purchasedDate,
+          monthlyPayment: monthlyPayment,
+          buyer: {
+            name: formData.customerName,
+            passport: formData.passportNumber,
+            phone: formData.phoneNumber,
+            email: "" // Add email if needed
+          }
+        }
+      };
+
+      // Update installment via API
+      const response = await fetch(`${API_BASE_URL}/api/car/${installmentId}/sell-installment`, {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify(installmentData),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert("Unauthorized: Please login again.");
+          router.push('/admin/login');
+          return;
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      }
+
+      alert("Installment updated successfully!");
+      router.push(`/admin/installment-details/${installmentId}`);
+    } catch (error) {
+      console.error("Failed to update installment:", error);
+      alert(`Failed to update installment: ${error.message}`);
+    }
   };
 
   const handleLogout = () => {
@@ -315,7 +421,7 @@ export default function EditInstallment() {
                         required
                       />
                     </div>
-                    <div>
+                    {/* <div>
                       <label htmlFor="carListNo" className="block text-sm font-medium text-white mb-2">
                         Car List No. *
                       </label>
@@ -328,7 +434,7 @@ export default function EditInstallment() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                         required
                       />
-                    </div>
+                    </div> */}
                     <div>
                       <label htmlFor="purchasedDate" className="block text-sm font-medium text-white mb-2">
                         Purchased Date *

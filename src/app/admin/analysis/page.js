@@ -3,139 +3,179 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 
 export default function AnalysisPage() {
-  const [installments, setInstallments] = useState([]);
-  const [soldCars, setSoldCars] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [profitData, setProfitData] = useState({
     monthly: [],
     sixMonths: [],
     yearly: []
   });
+  const [totalProfit, setTotalProfit] = useState(0);
+  const [carsData, setCarsData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const handleLogout = () => {
     window.location.href = '/admin/login';
   };
 
-  // Load data from localStorage
+  // Fetch profit analysis data from API
   useEffect(() => {
-    // Only load sold cars data (exclude installments)
-    const soldCarsData = JSON.parse(localStorage.getItem('soldCars') || '[]');
-    setSoldCars(soldCarsData);
-    
-    // Calculate profit data for sold cars only
-    calculateProfitData([], soldCarsData);
-  }, []);
+    if (typeof window === "undefined") {
+      return;
+    }
 
-  // Calculate profit for installment cars (assume 15% profit margin)
-  const calculateInstallmentProfit = (car) => {
-    const carPrice = parseFloat(car.carPrice) || 0;
-    const profitMargin = 0.15; // 15% profit margin
-    return carPrice * profitMargin;
-  };
+    const fetchProfitAnalysis = async (period) => {
+      if (!API_BASE_URL) {
+        console.warn("API base URL is not set. Cannot fetch profit analysis.");
+        setLoading(false);
+        return;
+      }
 
-  // Calculate profit for sold cars (assume 20% profit margin)
-  const parseCurrency = (value) => {
-    if (!value && value !== 0) return 0;
-    if (typeof value === 'number') return value;
-    const cleaned = value.toString().replace(/[^\d.-]/g, '');
-    return parseFloat(cleaned) || 0;
-  };
+      try {
+        setLoading(true);
+        
+        // Get token from localStorage for authentication
+        const token = localStorage.getItem('token');
+        
+        const headers = {};
+        
+        // Add Authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Convert frontend period to backend period format
+        const apiPeriod = period === 'sixMonths' ? '6months' : period;
+        
+        // Fetch profit analysis from API with period parameter
+        const response = await fetch(`${API_BASE_URL}/api/analysis/profit?period=${apiPeriod}`, {
+          cache: "no-store",
+          headers: headers
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            alert("Unauthorized: Please login again.");
+            window.location.href = '/admin/login';
+            return;
+          }
+          if (response.status === 400) {
+            const errorData = await response.json();
+            alert(errorData.message || "Invalid period parameter");
+            setLoading(false);
+            return;
+          }
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        
+        const data = await response.json();
 
-  const calculateSoldCarProfit = (car) => {
-    const carPrice = parseCurrency(car.soldPrice) || parseCurrency(car.sellingPrice) || parseCurrency(car.carPrice);
-    const profitMargin = 0.20; // 20% profit margin
-    return carPrice * profitMargin;
-  };
+        console.log('data', data);
+        
+        if (data.success) {
+          // Set cars data and total profit from API response
+          setCarsData(data.cars || []);
+          setTotalProfit(data.totalProfit || 0);
+          
+          // Group data by period for display
+          const groupedData = groupDataByPeriod(data.cars || [], apiPeriod);
+          const stateKey = period === 'sixMonths' ? 'sixMonths' : period;
+          
+          setProfitData(prev => ({
+            ...prev,
+            [stateKey]: groupedData
+          }));
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading profit analysis:", error);
+        alert(`Failed to load profit analysis: ${error.message}`);
+        setLoading(false);
+      }
+    };
 
-  // Calculate profit data for different periods (Sold Cars Only)
-  const calculateProfitData = (installmentsData, soldCarsData) => {
+    // Fetch data for the selected period
+    fetchProfitAnalysis(selectedPeriod);
+  }, [API_BASE_URL, selectedPeriod]);
+
+  // Group cars data by period for display
+  const groupDataByPeriod = (cars, period) => {
     const now = new Date();
-    const monthlyData = [];
-    const sixMonthsData = [];
-    const yearlyData = [];
+    const grouped = {};
 
-    // Monthly profit calculation (Sold Cars Only)
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
-      let monthlyProfit = 0;
-      let soldCount = 0;
+    cars.forEach(car => {
+      const soldDate = new Date(car.soldOutDate);
+      if (isNaN(soldDate.getTime())) return;
 
-      // Calculate sold car profits only
-      soldCarsData.forEach(car => {
-        const soldDate = new Date(car.soldDate || car.purchaseDate);
-        if (soldDate.getFullYear() === date.getFullYear() && 
-            soldDate.getMonth() === date.getMonth()) {
-          monthlyProfit += calculateSoldCarProfit(car);
-          soldCount++;
-        }
-      });
+      let key;
+      if (period === 'monthly') {
+        key = `${soldDate.getFullYear()}-${String(soldDate.getMonth() + 1).padStart(2, '0')}`;
+      } else if (period === '6months') {
+        key = `${soldDate.getFullYear()}-${String(soldDate.getMonth() + 1).padStart(2, '0')}`;
+      } else if (period === 'yearly') {
+        key = soldDate.getFullYear().toString();
+      }
 
-      monthlyData.unshift({
-        month: monthKey,
-        profit: monthlyProfit,
-        installmentCars: 0, // Always 0 for sold cars analysis
-        soldCars: soldCount,
-        totalCars: soldCount
-      });
-    }
+      if (!key) return;
 
-    // Six months profit calculation (Sold Cars Only)
-    for (let i = 0; i < 6; i++) {
-      const startDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-      const monthKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
-      
-      let monthProfit = 0;
-      let soldCount = 0;
+      if (!grouped[key]) {
+        grouped[key] = {
+          [period === 'yearly' ? 'year' : 'month']: key,
+          profit: 0,
+          soldCars: 0,
+          totalCars: 0
+        };
+      }
 
-      soldCarsData.forEach(car => {
-        const soldDate = new Date(car.soldDate || car.purchaseDate);
-        if (soldDate >= startDate && soldDate <= endDate) {
-          monthProfit += calculateSoldCarProfit(car);
-          soldCount++;
-        }
-      });
-
-      sixMonthsData.unshift({
-        month: monthKey,
-        profit: monthProfit,
-        installmentCars: 0, // Always 0 for sold cars analysis
-        soldCars: soldCount,
-        totalCars: soldCount
-      });
-    }
-
-    // Yearly profit calculation (Sold Cars Only)
-    for (let i = 0; i < 5; i++) {
-      const year = now.getFullYear() - i;
-      let yearlyProfit = 0;
-      let soldCount = 0;
-
-      soldCarsData.forEach(car => {
-        const soldDate = new Date(car.soldDate || car.purchaseDate);
-        if (soldDate.getFullYear() === year) {
-          yearlyProfit += calculateSoldCarProfit(car);
-          soldCount++;
-        }
-      });
-
-      yearlyData.unshift({
-        year: year.toString(),
-        profit: yearlyProfit,
-        installmentCars: 0, // Always 0 for sold cars analysis
-        soldCars: soldCount,
-        totalCars: soldCount
-      });
-    }
-
-    setProfitData({
-      monthly: monthlyData,
-      sixMonths: sixMonthsData,
-      yearly: yearlyData
+      grouped[key].profit += car.profit || 0;
+      grouped[key].soldCars += 1;
+      grouped[key].totalCars += 1;
     });
+
+    // Convert to array and sort
+    const result = Object.values(grouped).sort((a, b) => {
+      const keyA = period === 'yearly' ? a.year : a.month;
+      const keyB = period === 'yearly' ? b.year : b.month;
+      return keyA.localeCompare(keyB);
+    });
+
+    // For monthly and 6months, fill in missing months
+    if (period === 'monthly' || period === '6months') {
+      const months = period === 'monthly' ? 12 : 6;
+      const filled = [];
+      for (let i = 0; i < months; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const existing = result.find(r => r.month === monthKey);
+        filled.unshift(existing || {
+          month: monthKey,
+          profit: 0,
+          soldCars: 0,
+          totalCars: 0
+        });
+      }
+      return filled;
+    }
+
+    // For yearly, fill in missing years
+    if (period === 'yearly') {
+      const filled = [];
+      for (let i = 0; i < 5; i++) {
+        const year = (now.getFullYear() - i).toString();
+        const existing = result.find(r => r.year === year);
+        filled.unshift(existing || {
+          year: year,
+          profit: 0,
+          soldCars: 0,
+          totalCars: 0
+        });
+      }
+      return filled;
+    }
+
+    return result;
   };
 
   // Get current period data
@@ -152,16 +192,19 @@ export default function AnalysisPage() {
     }
   };
 
-  // Calculate total profit for current period
+  // Calculate total profit for current period (from API response)
   const getTotalProfit = () => {
-    const data = getCurrentData();
-    return data.reduce((total, item) => total + item.profit, 0);
+    return totalProfit;
   };
 
-  // Calculate total cars for current period
+  // Calculate total cars for current period (from API response)
   const getTotalCars = () => {
-    const data = getCurrentData();
-    return data.reduce((total, item) => total + item.totalCars, 0);
+    return carsData.length;
+  };
+
+  // Calculate total sales (from API response)
+  const getTotalSales = () => {
+    return carsData.reduce((total, car) => total + (car.soldPrice || 0), 0);
   };
 
   // Export to CSV (Excel compatible)
@@ -169,33 +212,57 @@ export default function AnalysisPage() {
     setIsExporting(true);
     
     try {
-      const data = getCurrentData();
+      const periodText = selectedPeriod === 'monthly' ? 'Last 12 Months' : 
+                        selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years';
       const periodLabel = selectedPeriod === 'yearly' ? 'Year' : 'Month';
+      const groupedData = getCurrentData();
       
-      // Create CSV content
-      let csvContent = `${periodLabel},Profit (฿),Sold Cars,Average Profit per Car (฿)\n`;
+      // Create CSV content with BOM for Excel UTF-8 support
+      let csvContent = '\uFEFF'; // UTF-8 BOM
       
-      // Add data rows
-      data.forEach(item => {
+      // Header Section
+      csvContent += `BKK KAUNG PYAE CAR SHOWROOM - Profit Analysis Report\n`;
+      csvContent += `Period: ${periodText}\n`;
+      csvContent += `Generated: ${new Date().toLocaleString()}\n`;
+      csvContent += `\n`;
+      
+      // Summary Section
+      csvContent += `SUMMARY\n`;
+      csvContent += `Total Profit,฿${getTotalProfit().toLocaleString()}\n`;
+      csvContent += `Total Sold Cars,${getTotalCars()}\n`;
+      csvContent += `Total Sales,฿${getTotalSales().toLocaleString()}\n`;
+      csvContent += `Average Profit per Car,฿${getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}\n`;
+      csvContent += `Profit Margin,${getTotalSales() > 0 ? ((getTotalProfit() / getTotalSales()) * 100).toFixed(2) : '0'}%\n`;
+      csvContent += `\n`;
+      
+      // Grouped Data by Period
+      csvContent += `PROFIT BY ${periodLabel.toUpperCase()}\n`;
+      csvContent += `${periodLabel},Profit (฿),Sold Cars,Average Profit per Car (฿)\n`;
+      
+      groupedData.forEach(item => {
         const period = selectedPeriod === 'yearly' ? item.year : item.month;
         const avgProfit = item.totalCars > 0 ? (item.profit / item.totalCars) : 0;
-        csvContent += `${period},${item.profit},${item.soldCars},${avgProfit}\n`;
+        csvContent += `${period},฿${item.profit.toLocaleString()},${item.soldCars},฿${avgProfit.toLocaleString()}\n`;
       });
       
-      // Add summary rows
       csvContent += `\n`;
-      csvContent += `SUMMARY,,,\n`;
-      csvContent += `Total Profit,${getTotalProfit()},,\n`;
-      csvContent += `Total Sold Cars,,${getTotalCars()},\n`;
-      csvContent += `Average Profit per Car,,,${getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()) : 0}\n`;
-      csvContent += `Period,${selectedPeriod === 'monthly' ? 'Last 12 Months' : selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years'},,\n`;
+      
+      // Detailed Car List
+      csvContent += `DETAILED CAR PROFIT REPORT\n`;
+      csvContent += `No.,License No.,Brand,Purchase Price (฿),Sold Price (฿),Total Repairs (฿),Profit (฿),Sold Date\n`;
+      
+      carsData.forEach((car, index) => {
+        const soldDate = car.soldOutDate ? new Date(car.soldOutDate).toLocaleDateString('en-GB') : 'N/A';
+        csvContent += `${index + 1},${car.licenseNo || 'N/A'},${car.brand || 'N/A'},฿${(car.purchasePrice || 0).toLocaleString()},฿${(car.soldPrice || 0).toLocaleString()},฿${(car.totalRepairs || 0).toLocaleString()},฿${(car.profit || 0).toLocaleString()},${soldDate}\n`;
+      });
       
       // Create and download file
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `BKK_SoldCars_Analysis_${selectedPeriod}_${new Date().toISOString().split('T')[0]}.csv`);
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `BKK_Profit_Analysis_${selectedPeriod}_${dateStr}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -204,6 +271,7 @@ export default function AnalysisPage() {
       setTimeout(() => setIsExporting(false), 1000);
     } catch (error) {
       console.error('CSV export error:', error);
+      alert('Failed to export CSV: ' + error.message);
       setIsExporting(false);
     }
   };
@@ -213,75 +281,250 @@ export default function AnalysisPage() {
     setIsExporting(true);
     
     try {
-      const data = getCurrentData();
+      const groupedData = getCurrentData();
       const periodText = selectedPeriod === 'monthly' ? 'Last 12 Months' : 
                         selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years';
+      const periodLabel = selectedPeriod === 'yearly' ? 'Year' : 'Month';
+      
+      // Format date for display
+      const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+          return new Date(dateString).toLocaleDateString('en-GB');
+        } catch {
+          return dateString;
+        }
+      };
       
       // Create HTML content for PDF
       const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
-          <title>BKK KAUNG PYAE CAR SHOWROOM - Profit Analysis</title>
+          <title>BKK KAUNG PYAE CAR SHOWROOM - Profit Analysis Report</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .title { font-size: 24px; font-weight: bold; color: #dc3545; }
-            .subtitle { font-size: 18px; margin-top: 10px; }
-            .info { margin-bottom: 20px; }
-            .summary { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #dc3545; color: white; }
-            tr:nth-child(even) { background-color: #f2f2f2; }
-            .footer { margin-top: 30px; font-size: 12px; color: #666; }
+            @page {
+              margin: 1cm;
+              size: A4;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0;
+              padding: 20px;
+              font-size: 12px;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px;
+              border-bottom: 3px solid #dc3545;
+              padding-bottom: 15px;
+            }
+            .title { 
+              font-size: 24px; 
+              font-weight: bold; 
+              color: #dc3545;
+              margin-bottom: 5px;
+            }
+            .subtitle { 
+              font-size: 16px; 
+              color: #666;
+              margin-top: 5px;
+            }
+            .info { 
+              margin-bottom: 20px;
+              display: flex;
+              justify-content: space-between;
+            }
+            .info-item {
+              display: inline-block;
+            }
+            .summary { 
+              background-color: #f8f9fa; 
+              padding: 15px; 
+              border-radius: 5px; 
+              margin-bottom: 20px;
+              border-left: 4px solid #dc3545;
+            }
+            .summary-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-top: 10px;
+            }
+            .summary-item {
+              padding: 10px;
+              background: white;
+              border-radius: 3px;
+            }
+            .summary-label {
+              font-size: 11px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .summary-value {
+              font-size: 18px;
+              font-weight: bold;
+              color: #dc3545;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 20px;
+              font-size: 11px;
+            }
+            th, td { 
+              border: 1px solid #ddd; 
+              padding: 8px; 
+              text-align: left; 
+            }
+            th { 
+              background-color: #dc3545; 
+              color: white;
+              font-weight: bold;
+              text-align: center;
+            }
+            tr:nth-child(even) { 
+              background-color: #f9f9f9; 
+            }
+            .profit-positive {
+              color: #28a745;
+              font-weight: bold;
+            }
+            .profit-negative {
+              color: #dc3545;
+              font-weight: bold;
+            }
+            .section-title {
+              font-size: 16px;
+              font-weight: bold;
+              color: #333;
+              margin: 25px 0 10px 0;
+              padding-bottom: 5px;
+              border-bottom: 2px solid #dc3545;
+            }
+            .footer { 
+              margin-top: 30px; 
+              font-size: 10px; 
+              color: #666;
+              text-align: center;
+              border-top: 1px solid #ddd;
+              padding-top: 10px;
+            }
+            .page-break {
+              page-break-before: always;
+            }
             @media print {
               body { margin: 0; }
               .no-print { display: none; }
+              table { page-break-inside: auto; }
+              tr { page-break-inside: avoid; page-break-after: auto; }
             }
           </style>
         </head>
         <body>
           <div class="header">
             <div class="title">BKK KAUNG PYAE CAR SHOWROOM</div>
-            <div class="subtitle">Sold Cars Analysis Report</div>
+            <div class="subtitle">Profit Analysis Report</div>
           </div>
           
           <div class="info">
-            <p><strong>Period:</strong> ${periodText}</p>
-            <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
+            <div class="info-item">
+              <strong>Period:</strong> ${periodText}
+            </div>
+            <div class="info-item">
+              <strong>Generated:</strong> ${new Date().toLocaleString()}
+            </div>
           </div>
           
           <div class="summary">
-            <h3>Summary</h3>
-            <p><strong>Total Profit:</strong> ฿${getTotalProfit().toLocaleString()}</p>
-            <p><strong>Total Sold Cars:</strong> ${getTotalCars()}</p>
-            <p><strong>Average Profit per Car:</strong> ฿${getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}</p>
+            <h3 style="margin-top: 0;">Executive Summary</h3>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Profit</div>
+                <div class="summary-value">฿${getTotalProfit().toLocaleString()}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Sold Cars</div>
+                <div class="summary-value">${getTotalCars()}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Sales</div>
+                <div class="summary-value">฿${getTotalSales().toLocaleString()}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Average Profit per Car</div>
+                <div class="summary-value">฿${getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Profit Margin</div>
+                <div class="summary-value">${getTotalSales() > 0 ? ((getTotalProfit() / getTotalSales()) * 100).toFixed(2) : '0'}%</div>
+              </div>
+            </div>
           </div>
           
+          <div class="section-title">Profit by ${periodLabel}</div>
           <table>
             <thead>
               <tr>
-                <th>${selectedPeriod === 'yearly' ? 'Year' : 'Month'}</th>
+                <th>${periodLabel}</th>
                 <th>Profit (฿)</th>
                 <th>Sold Cars</th>
-                <th>Avg Profit/Car</th>
+                <th>Avg Profit/Car (฿)</th>
               </tr>
             </thead>
             <tbody>
-              ${data.map(item => `
-                <tr>
-                  <td>${selectedPeriod === 'yearly' ? item.year : item.month}</td>
-                  <td>฿${item.profit.toLocaleString()}</td>
-                  <td>${item.soldCars}</td>
-                  <td>฿${item.totalCars > 0 ? (item.profit / item.totalCars).toLocaleString() : '0'}</td>
-                </tr>
-              `).join('')}
+              ${groupedData.map(item => {
+                const period = selectedPeriod === 'yearly' ? item.year : item.month;
+                const avgProfit = item.totalCars > 0 ? (item.profit / item.totalCars) : 0;
+                return `
+                  <tr>
+                    <td>${period}</td>
+                    <td class="profit-positive">฿${item.profit.toLocaleString()}</td>
+                    <td>${item.soldCars}</td>
+                    <td>฿${avgProfit.toLocaleString()}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+          
+          <div class="section-title page-break">Detailed Car Profit Report</div>
+          <table>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>License No.</th>
+                <th>Brand</th>
+                <th>Purchase Price (฿)</th>
+                <th>Sold Price (฿)</th>
+                <th>Repairs (฿)</th>
+                <th>Profit (฿)</th>
+                <th>Sold Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${carsData.map((car, index) => {
+                const profit = car.profit || 0;
+                const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
+                return `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${car.licenseNo || 'N/A'}</td>
+                    <td>${car.brand || 'N/A'}</td>
+                    <td>฿${(car.purchasePrice || 0).toLocaleString()}</td>
+                    <td>฿${(car.soldPrice || 0).toLocaleString()}</td>
+                    <td>฿${(car.totalRepairs || 0).toLocaleString()}</td>
+                    <td class="${profitClass}">฿${profit.toLocaleString()}</td>
+                    <td>${formatDate(car.soldOutDate)}</td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
           
           <div class="footer">
             <p>Generated on ${new Date().toLocaleString()} | BKK KAUNG PYAE CAR SHOWROOM</p>
+            <p>This report contains confidential business information.</p>
           </div>
         </body>
         </html>
@@ -302,6 +545,7 @@ export default function AnalysisPage() {
       
     } catch (error) {
       console.error('PDF export error:', error);
+      alert('Failed to export PDF: ' + error.message);
       setIsExporting(false);
     }
   };
@@ -352,8 +596,14 @@ export default function AnalysisPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto py-4 sm:py-6 px-2 sm:px-6 lg:px-8">
         <div className="px-2 sm:px-4 py-4 sm:py-6 sm:px-0">
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-white text-xl">Loading analysis data...</div>
+            </div>
+          ) : (
+            <>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Sold Cars Analysis</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Profit Analysis</h2>
             
             <div className="flex flex-col sm:flex-row gap-3">
               {/* Export Buttons */}
@@ -460,8 +710,10 @@ export default function AnalysisPage() {
                   </div>
                 </div>
                 <div className="ml-3 sm:ml-4">
-                  <div className="text-sm sm:text-base font-medium text-gray-300">Profit Margin</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">20%</div>
+                  <div className="text-sm sm:text-base font-medium text-gray-300">Avg Profit/Car</div>
+                  <div className="text-2xl sm:text-3xl font-semibold text-white">
+                    ฿{getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -477,7 +729,7 @@ export default function AnalysisPage() {
                 </div>
                 <div className="ml-3 sm:ml-4">
                   <div className="text-sm sm:text-base font-medium text-gray-300">Total Sales</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">฿{(soldCars.reduce((total, car) => total + parseCurrency(car.soldPrice || car.sellingPrice || car.carPrice), 0)).toLocaleString()}</div>
+                  <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalSales().toLocaleString()}</div>
                 </div>
               </div>
             </div>
@@ -544,7 +796,7 @@ export default function AnalysisPage() {
                       ฿{getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}
                     </div>
                     <div className="text-gray-400 text-sm">
-                      20% margin
+                      {getTotalSales() > 0 ? ((getTotalProfit() / getTotalSales()) * 100).toFixed(1) : '0'}% margin
                     </div>
                   </div>
                 </div>
@@ -629,6 +881,8 @@ export default function AnalysisPage() {
               </table>
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

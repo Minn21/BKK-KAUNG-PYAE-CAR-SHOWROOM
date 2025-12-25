@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import PhotoViewer from "../../../../components/PhotoViewer";
+import PhotoViewer from "@/app/components/PhotoViewer";
 
 export default function StaffCarDetails() {
   const params = useParams();

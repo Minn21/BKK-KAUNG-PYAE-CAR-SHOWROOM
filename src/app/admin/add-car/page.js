@@ -26,14 +26,149 @@ export default function AddCar() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRepairHistory, setShowRepairHistory] = useState(false);
   const [repairHistory, setRepairHistory] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [generalError, setGeneralError] = useState('');
   
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  // Validation functions
+  const validateField = (name, value) => {
+    let error = '';
+    
+    switch(name) {
+      case 'licenseNo':
+        if (!value || value.trim().length < 2) {
+          error = 'License number must be at least 2 characters';
+        } else if (value.trim().length > 20) {
+          error = 'License number must be less than 20 characters';
+        }
+        break;
+      
+      case 'brand':
+        if (!value || value.trim().length === 0) {
+          error = 'Brand is required';
+        } else if (value.trim().length > 50) {
+          error = 'Brand must be less than 50 characters';
+        }
+        break;
+      
+      case 'model':
+        if (!value || value.trim().length === 0) {
+          error = 'Model is required';
+        } else if (value.trim().length > 50) {
+          error = 'Model must be less than 50 characters';
+        }
+        break;
+      
+      case 'engine':
+        if (!value || value.trim().length === 0) {
+          error = 'Engine power is required';
+        }
+        break;
+      
+      case 'color':
+        if (!value || value.trim().length === 0) {
+          error = 'Color is required';
+        }
+        break;
+      
+      case 'wd':
+        if (!value) {
+          error = 'Wheel drive is required';
+        }
+        break;
+      
+      case 'gear':
+        if (!value) {
+          error = 'Gear type is required';
+        }
+        break;
+      
+      case 'price':
+        const price = parseFloat(value);
+        if (!value || value.trim() === '') {
+          error = 'Selling price is required';
+        } else if (isNaN(price) || price <= 0) {
+          error = 'Selling price must be greater than 0';
+        } else if (price > 100000000) {
+          error = 'Selling price seems too high';
+        }
+        break;
+      
+      case 'originalPrice':
+        const origPrice = parseFloat(value);
+        if (value && value.trim() !== '') {
+          if (isNaN(origPrice) || origPrice <= 0) {
+            error = 'Original price must be greater than 0';
+          } else if (origPrice > 100000000) {
+            error = 'Original price seems too high';
+          }
+        }
+        break;
+      
+      case 'year':
+        const year = parseInt(value);
+        if (!value || value.trim() === '') {
+          error = 'Year is required';
+        } else if (isNaN(year) || year < 1900 || year > 2030) {
+          error = 'Year must be between 1900 and 2030';
+        }
+        break;
+      
+      case 'purchasedKilo':
+        const kilo = parseInt(value);
+        if (!value || value.trim() === '') {
+          error = 'Kilometer reading is required';
+        } else if (isNaN(kilo) || kilo < 0) {
+          error = 'Kilometer reading must be 0 or greater';
+        } else if (kilo > 10000000) {
+          error = 'Kilometer reading seems too high';
+        }
+        break;
+      
+      case 'purchaseDate':
+        if (!value) {
+          error = 'Purchase date is required';
+        } else {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            error = 'Purchase date must be a valid date';
+          }
+        }
+        break;
+    }
+    
+    return error;
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+    
+    // Clear errors when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+    
+    // Clear general error when user starts making changes
+    if (generalError) {
+      setGeneralError('');
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    const error = validateField(name, value);
+    
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: error
     }));
   };
 
@@ -61,6 +196,34 @@ export default function AddCar() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Clear any previous general errors
+    setGeneralError('');
+    
+    // Validate all fields before submission
+    const errors = {};
+    const fieldsToValidate = [
+      'licenseNo', 'brand', 'model', 'engine', 'color', 
+      'wd', 'gear', 'price', 'originalPrice', 'year', 
+      'purchasedKilo', 'purchaseDate'
+    ];
+    
+    fieldsToValidate.forEach(field => {
+      const error = validateField(field, formData[field]);
+      if (error) {
+        errors[field] = error;
+      }
+    });
+    
+    // If there are errors, show them and don't submit
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setGeneralError('Please fix all errors before submitting the form.');
+      // Scroll to top to see the error banner
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
@@ -285,9 +448,33 @@ export default function AddCar() {
               errorData = { message: errorText || `API creation failed: ${response.status}` };
             }
             
-            // Format validation errors for user-friendly display
+            // Check for duplicate key error (MongoDB E11000)
             let errorMessage = errorData.message || errorData.error || `API creation failed: ${response.status}`;
-            if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+            console.log('Error message to check:', errorMessage);
+            console.log('Contains E11000:', errorMessage.includes('E11000'));
+            console.log('Contains licenseNo:', errorMessage.includes('licenseNo'));
+            
+            // Handle duplicate license number
+            if (errorMessage.includes('E11000') && errorMessage.includes('licenseNo')) {
+              console.log('Detected duplicate license error, parsing...');
+              // Extract the duplicate license number - handle both escaped and unescaped quotes
+              const match = errorMessage.match(/dup key: \{ licenseNo: \\"?([^"\\]+)\\"? \}/) || 
+                            errorMessage.match(/dup key: \{ licenseNo: "([^"]+)" \}/);
+              console.log('Regex match result:', match);
+              const duplicateLicense = match ? match[1] : formData.licenseNo;
+              console.log('Extracted license number:', duplicateLicense);
+              
+              // Set field error for license number
+              setFieldErrors(prev => ({
+                ...prev,
+                licenseNo: `License number "${duplicateLicense}" is already registered in the system`
+              }));
+              
+              errorMessage = `⚠️ Duplicate License Number\n\nThe license number "${duplicateLicense}" is already registered in the system.\n\nPlease use a different license number or check if this car already exists in the database.`;
+              console.log('Final error message:', errorMessage);
+            }
+            // Format other validation errors for user-friendly display
+            else if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
               console.log('Validation errors:', errorData.errors);
               const errorMessages = errorData.errors.map(err => 
                 `${err.field}: ${err.message}${err.value !== undefined ? ` (received: ${JSON.stringify(err.value)})` : ''}`
@@ -298,17 +485,23 @@ export default function AddCar() {
             throw new Error(errorMessage);
           }
         } catch (apiError) {
-          alert(`Error creating car: ${apiError.message || "Please try again."}`);
+          setGeneralError(apiError.message || "Error creating car. Please try again.");
+          // Scroll to top to see the error banner
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           throw apiError; // Re-throw to be caught by outer catch
         }
       } else {
         // If API_BASE_URL is not set, show error
-        alert("API endpoint is not configured. Please set NEXT_PUBLIC_API_BASE_URL.");
+        setGeneralError("API endpoint is not configured. Please set NEXT_PUBLIC_API_BASE_URL.");
         throw new Error("API endpoint not configured");
       }
       
     } catch (error) {
-      alert(`Error adding car: ${error.message || "Please try again."}`);
+      // Error is already set in the try block, just ensure it's displayed
+      if (!generalError) {
+        setGeneralError(error.message || "Error adding car. Please try again.");
+      }
+      console.error('Form submission error:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -355,6 +548,34 @@ export default function AddCar() {
           {/* Form */}
           <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-lg p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Error Banner */}
+              {generalError && (
+                <div className="bg-red-500/20 border-2 border-red-500 rounded-lg p-4 backdrop-blur-xl">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-base font-bold text-red-400">Error</h3>
+                      <div className="mt-2 text-sm text-white whitespace-pre-line">
+                        {generalError}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setGeneralError('')}
+                      className="ml-3 flex-shrink-0 text-red-400 hover:text-red-300"
+                    >
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               {/* Basic Information */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
@@ -367,10 +588,18 @@ export default function AddCar() {
                     name="licenseNo"
                     value={formData.licenseNo}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.licenseNo 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., ABC-123"
                   />
+                  {fieldErrors.licenseNo && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.licenseNo}</p>
+                  )}
                 </div>
 
                 <div>
@@ -383,10 +612,18 @@ export default function AddCar() {
                     name="brand"
                     value={formData.brand}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.brand 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., Toyota"
                   />
+                  {fieldErrors.brand && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.brand}</p>
+                  )}
                 </div>
 
                 <div>
@@ -399,10 +636,18 @@ export default function AddCar() {
                     name="model"
                     value={formData.model}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.model 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., Camry"
                   />
+                  {fieldErrors.model && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.model}</p>
+                  )}
                 </div>
 
                 <div>
@@ -421,10 +666,18 @@ export default function AddCar() {
                         handleInputChange(e);
                       }
                     }}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.price 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., 25000"
                   />
+                  {fieldErrors.price && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.price}</p>
+                  )}
                 </div>
 
                 <div>
@@ -443,9 +696,17 @@ export default function AddCar() {
                         handleInputChange(e);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    onBlur={handleBlur}
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.originalPrice 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., 20000"
                   />
+                  {fieldErrors.originalPrice && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.originalPrice}</p>
+                  )}
                 </div>
 
                 <div>
@@ -458,10 +719,18 @@ export default function AddCar() {
                     name="color"
                     value={formData.color}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.color 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., White"
                   />
+                  {fieldErrors.color && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.color}</p>
+                  )}
                 </div>
 
                 <div>
@@ -474,10 +743,18 @@ export default function AddCar() {
                     name="engine"
                     value={formData.engine}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.engine 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., 2.5L"
                   />
+                  {fieldErrors.engine && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.engine}</p>
+                  )}
                 </div>
 
                 <div>
@@ -496,10 +773,18 @@ export default function AddCar() {
                         handleInputChange(e);
                       }
                     }}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.year 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., 2023"
                   />
+                  {fieldErrors.year && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.year}</p>
+                  )}
                 </div>
 
                 <div>
@@ -518,10 +803,18 @@ export default function AddCar() {
                         handleInputChange(e);
                       }
                     }}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.purchasedKilo 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                     placeholder="e.g., 50000"
                   />
+                  {fieldErrors.purchasedKilo && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.purchasedKilo}</p>
+                  )}
                 </div>
 
                 <div>
@@ -534,9 +827,17 @@ export default function AddCar() {
                     name="purchaseDate"
                     value={formData.purchaseDate}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 ${
+                      fieldErrors.purchaseDate 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                   />
+                  {fieldErrors.purchaseDate && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.purchaseDate}</p>
+                  )}
                 </div>
 
                 <div>
@@ -548,8 +849,13 @@ export default function AddCar() {
                     name="wd"
                     value={formData.wd}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white text-base focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white text-base focus:outline-none focus:ring-2 ${
+                      fieldErrors.wd 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                   >
                     <option value="">Select WD</option>
                     <option value="FWD">Front Wheel Drive (FWD)</option>
@@ -557,6 +863,9 @@ export default function AddCar() {
                     <option value="AWD">All Wheel Drive (AWD)</option>
                     <option value="4WD">Four Wheel Drive (4WD)</option>
                   </select>
+                  {fieldErrors.wd && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.wd}</p>
+                  )}
                 </div>
 
                 <div>
@@ -568,8 +877,13 @@ export default function AddCar() {
                     name="gear"
                     value={formData.gear}
                     onChange={handleInputChange}
+                    onBlur={handleBlur}
                     required
-                    className="w-full px-3 py-2 border border-gray-600 rounded-md bg-black/30 text-white text-base focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md bg-black/30 text-white text-base focus:outline-none focus:ring-2 ${
+                      fieldErrors.gear 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-gray-600 focus:ring-red-500'
+                    } focus:border-transparent`}
                   >
                     <option value="">Select Gear Type</option>
                     <option value="Manual">Manual</option>
@@ -577,6 +891,9 @@ export default function AddCar() {
                     <option value="CVT">CVT</option>
                     <option value="Semi-Auto">Semi-Automatic</option>
                   </select>
+                  {fieldErrors.gear && (
+                    <p className="mt-1 text-sm text-red-400">{fieldErrors.gear}</p>
+                  )}
                 </div>
 
               </div>

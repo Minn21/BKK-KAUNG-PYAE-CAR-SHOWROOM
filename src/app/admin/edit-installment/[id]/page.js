@@ -26,8 +26,11 @@ export default function EditInstallment() {
   const [ownerBookStatus, setOwnerBookStatus] = useState('pending');
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [penaltyFees, setPenaltyFees] = useState({});
+  const [confirmedPenalties, setConfirmedPenalties] = useState({});
   const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
   const [bulkActionMessage, setBulkActionMessage] = useState("");
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [showMarkAllPaidConfirmation, setShowMarkAllPaidConfirmation] = useState(false);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   useEffect(() => {
@@ -84,8 +87,8 @@ export default function EditInstallment() {
         const monthlyPayment = installment.monthlyPayment || summaryData.monthlyPayment || 0;
         
         // Calculate total price (downPayment + remainingAmount)
-        const totalPrice =
-          (installment.downPayment || 0) + (installment.remainingAmount || 0);
+        // Use the original car price (priceToSell) - same as shown in other pages
+        const carPrice = carData.priceToSell || 0;
         
         // Convert start date to YYYY-MM-DD format for date input
         let formattedDate = "";
@@ -104,7 +107,7 @@ export default function EditInstallment() {
           customerName: buyer.name || "",
           passportNumber: buyer.passport || "",
           phoneNumber: buyer.phone || "",
-          carPrice: totalPrice.toString(),
+          carPrice: carPrice.toString(),
           downPayment: (installment.downPayment || 0).toString(),
           monthlyPayment: monthlyPayment.toString(),
           installmentPeriod: months.toString(),
@@ -213,6 +216,13 @@ export default function EditInstallment() {
       const penaltyFee = penaltyFees[monthNumber] || 0;
       const totalAmount = monthlyPayment + penaltyFee;
 
+      console.log('💰 Payment Data for Month', monthNumber, ':', {
+        monthlyPayment,
+        penaltyFee,
+        totalAmount,
+        penaltyFeesState: penaltyFees
+      });
+
       // Prepare payment data according to API validation requirements
       const paymentData = {
         monthNumber: monthNumber,
@@ -224,6 +234,9 @@ export default function EditInstallment() {
       // Add penalty fee if it exists
       if (penaltyFee > 0) {
         paymentData.penaltyFee = penaltyFee;
+        console.log('✅ Including penalty fee in payment:', penaltyFee);
+      } else {
+        console.log('❌ No penalty fee for this month');
       }
 
       const response = await fetch(`${API_BASE_URL}/api/car/${installmentId}/installment/monthly-payment`, {
@@ -451,6 +464,41 @@ export default function EditInstallment() {
     }
   };
 
+  const handleConfirmResetAll = async () => {
+    setShowResetConfirmation(false);
+    setBulkActionInProgress(true);
+    setBulkActionMessage("Resetting all payments...");
+    
+    const totalMonths = parseInt(formData.installmentPeriod) || 0;
+    // Reset only months that are currently marked as paid
+    for (let month = 1; month <= totalMonths; month++) {
+      if (paidMonths.has(month)) {
+        // eslint-disable-next-line no-await-in-loop
+        await handleResetMonthlyPayment(month);
+      }
+    }
+    
+    setBulkActionInProgress(false);
+    setBulkActionMessage("All payments have been reset.");
+  };
+
+  const handleConfirmMarkAllPaid = async () => {
+    setShowMarkAllPaidConfirmation(false);
+    setBulkActionInProgress(true);
+    setBulkActionMessage("Marking all months as paid...");
+    
+    const totalMonths = parseInt(formData.installmentPeriod) || 0;
+    for (let month = 1; month <= totalMonths; month++) {
+      if (!paidMonths.has(month)) {
+        // eslint-disable-next-line no-await-in-loop
+        await handleMonthlyPayment(month, { silent: true });
+      }
+    }
+    
+    setBulkActionInProgress(false);
+    setBulkActionMessage("All months have been marked as paid.");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -583,8 +631,8 @@ export default function EditInstallment() {
 
       {/* Back Button - Responsive Positioning */}
       <div className="absolute left-2 sm:left-4 top-16 sm:top-20 z-10">
-        <Link href="/admin/installments" className="text-white/80 hover:text-white text-sm font-medium transition-colors">
-          ← Back to Installments
+        <Link href={`/admin/installment-details/${installmentId}`} className="text-white/80 hover:text-white text-sm font-medium transition-colors">
+          ← Back to Details
         </Link>
       </div>
 
@@ -595,7 +643,7 @@ export default function EditInstallment() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Edit Installment</h2>
             <div className="flex space-x-4">
-              <Link href="/admin/installments" className="bg-black/20 backdrop-blur-md text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-black/30 hover:text-red-500 text-base sm:text-lg font-medium border border-white/30 transition-all duration-200 cursor-pointer">
+              <Link href={`/admin/installment-details/${installmentId}`} className="bg-black/20 backdrop-blur-md text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-black/30 hover:text-red-500 text-base sm:text-lg font-medium border border-white/30 transition-all duration-200 cursor-pointer">
                 Cancel
               </Link>
               <button
@@ -824,55 +872,24 @@ export default function EditInstallment() {
                         <div className="flex space-x-2">
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!window.confirm("Are you sure you want to reset all payments for this installment?")) {
-                                return;
-                              }
-                          setBulkActionInProgress(true);
-                          setBulkActionMessage("Resetting all payments...");
-                              const totalMonths = parseInt(formData.installmentPeriod) || 0;
-                              // Reset only months that are currently marked as paid
-                              for (let month = 1; month <= totalMonths; month++) {
-                                if (paidMonths.has(month)) {
-                                  // eslint-disable-next-line no-await-in-loop
-                                  await handleResetMonthlyPayment(month);
-                                }
-                              }
-                              setBulkActionInProgress(false);
-                              setBulkActionMessage("All payments have been reset.");
-                            }}
+                            onClick={() => setShowResetConfirmation(true)}
                             disabled={bulkActionInProgress}
                             className={`bg-black/20 backdrop-blur-md text-white px-3 py-1.5 rounded-md text-sm font-medium cursor-pointer border border-white/30 transition-all duration-200 ${
                               bulkActionInProgress
                                 ? "opacity-60 cursor-not-allowed"
-                                : "hover:bg-black/30"
+                                : "hover:bg-black/30 hover:text-red-500"
                             }`}
                           >
                             {bulkActionInProgress ? "Working..." : "Reset All"}
                           </button>
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!window.confirm("Are you sure you want to mark ALL months as paid?")) {
-                                return;
-                              }
-                              setBulkActionInProgress(true);
-                              setBulkActionMessage("Marking all months as paid...");
-                              const totalMonths = parseInt(formData.installmentPeriod) || 0;
-                              for (let month = 1; month <= totalMonths; month++) {
-                                if (!paidMonths.has(month)) {
-                                  // eslint-disable-next-line no-await-in-loop
-                                  await handleMonthlyPayment(month, { silent: true });
-                                }
-                              }
-                              setBulkActionInProgress(false);
-                              setBulkActionMessage("All months have been marked as paid.");
-                            }}
+                            onClick={() => setShowMarkAllPaidConfirmation(true)}
                             disabled={bulkActionInProgress}
                             className={`bg-black/20 backdrop-blur-md text-white px-3 py-1.5 rounded-md text-sm font-medium cursor-pointer border border-white/30 transition-all duration-200 ${
                               bulkActionInProgress
                                 ? "opacity-60 cursor-not-allowed"
-                                : "hover:bg-black/30"
+                                : "hover:bg-black/30 hover:text-green-500"
                             }`}
                           >
                             {bulkActionInProgress ? "Working..." : "Mark All Paid"}
@@ -970,26 +987,96 @@ export default function EditInstallment() {
                                     </span>
                                   </button>
                                 </div>
-                                <p className={`text-base font-bold mb-2 ${isDisabled ? 'text-gray-500' : 'text-white'}`}>
-                                  {formatCurrency(parseInt(formData.monthlyPayment) || 0)}
-                                </p>
-                                <p className={`text-xs mb-2 ${isDisabled ? 'text-gray-600' : 'text-gray-400'}`}>
-                                  Due: {dueDate.toLocaleDateString('en-GB')}
-                                </p>
+                                <div className="mb-2">
+                                  <p className="text-xs text-gray-400 mb-1">Monthly Payment</p>
+                                  <p className={`text-lg font-bold ${isDisabled ? 'text-gray-500' : 'text-white'}`}>
+                                    {formatCurrency(parseInt(formData.monthlyPayment) || 0)}
+                                  </p>
+                                </div>
+                                
                                 {!isPaid && !isDisabled && (
-                                  <div className="mt-2">
-                                    <label className="block text-xs text-gray-300 mb-1">Penalty Fee (Overdue)</label>
-                                    <input
-                                      type="number"
-                                      value={penaltyFees[monthNumber] || ''}
-                                      onChange={(e) => handlePenaltyFeeChange(monthNumber, e.target.value)}
-                                      placeholder="0"
-                                      min="0"
-                                      className="w-full px-2 py-1 text-sm border border-gray-500 rounded-md bg-black/30 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
+                                  <div 
+                                    className="mt-3 mb-2 pt-3 border-t border-gray-600"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  >
+                                    <label className="block text-xs font-medium text-red-300 mb-1">Add Penalty Fee (if overdue)</label>
+                                    <p className="text-xs text-gray-400 mb-2 italic">Enter amount, then click box to save</p>
+                                    <div className="flex gap-1">
+                                      <div className="flex-1 relative">
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">฿</span>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={penaltyFees[monthNumber] || ''}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
+                                            // Allow only numbers and empty string
+                                            if (value === '' || /^\d+$/.test(value)) {
+                                              handlePenaltyFeeChange(monthNumber, value);
+                                            }
+                                          }}
+                                          placeholder="0"
+                                          className="w-full pl-6 pr-2 py-2 text-sm border border-red-400 rounded-md bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                          onClick={(e) => e.stopPropagation()}
+                                          onFocus={(e) => {
+                                            e.stopPropagation();
+                                            e.target.select();
+                                          }}
+                                          onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              e.target.blur();
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const currentValue = penaltyFees[monthNumber] || 0;
+                                          if (currentValue > 0) {
+                                            setConfirmedPenalties(prev => ({
+                                              ...prev,
+                                              [monthNumber]: true
+                                            }));
+                                            setTimeout(() => {
+                                              setConfirmedPenalties(prev => ({
+                                                ...prev,
+                                                [monthNumber]: false
+                                              }));
+                                            }, 2000);
+                                          }
+                                          document.activeElement?.blur();
+                                        }}
+                                        className="px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-500 transition-colors cursor-pointer font-medium"
+                                      >
+                                        ✓
+                                      </button>
+                                    </div>
+                                    {confirmedPenalties[monthNumber] && (
+                                      <div className="mt-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-center">
+                                        <span className="text-green-400 text-xs font-medium">✓ Penalty fee added!</span>
+                                      </div>
+                                    )}
+                                    {penaltyFees[monthNumber] > 0 && !confirmedPenalties[monthNumber] && (
+                                      <div className="mt-2 pt-2 border-t border-red-400/30">
+                                        <div className="flex justify-between items-center text-xs">
+                                          <span className="text-gray-400">Total with Penalty:</span>
+                                          <span className="text-red-300 font-bold">
+                                            ฿{((parseInt(formData.monthlyPayment) || 0) + (penaltyFees[monthNumber] || 0)).toLocaleString()}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
+                                
+                                <p className={`text-xs ${isDisabled ? 'text-gray-600' : 'text-gray-400'} ${!isPaid && !isDisabled ? 'mt-2' : 'mt-0'}`}>
+                                  Due: {dueDate.toLocaleDateString('en-GB')}
+                                </p>
                                 {isDisabled && !isPaid && (
                                   <p className="text-xs text-gray-500 mt-2 italic">
                                     Complete previous months first
@@ -1088,6 +1175,62 @@ export default function EditInstallment() {
           </div>
         </div>
       </div>
+
+      {/* Reset All Confirmation Modal */}
+      {showResetConfirmation && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-600">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Reset All Payments</h3>
+              <p className="text-gray-300 mb-6">
+                Are you sure you want to reset all payments for this installment? This action will clear all payment records.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowResetConfirmation(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmResetAll}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-500 transition-colors cursor-pointer"
+                >
+                  Reset All
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark All Paid Confirmation Modal */}
+      {showMarkAllPaidConfirmation && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-600">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Mark All as Paid</h3>
+              <p className="text-gray-300 mb-6">
+                Are you sure you want to mark ALL months as paid? This will update all remaining unpaid months.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowMarkAllPaidConfirmation(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmMarkAllPaid}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-500 transition-colors cursor-pointer"
+                >
+                  Mark All Paid
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

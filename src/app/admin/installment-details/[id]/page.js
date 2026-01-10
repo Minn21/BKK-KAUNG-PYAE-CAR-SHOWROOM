@@ -86,8 +86,8 @@ export default function InstallmentDetails() {
             }
           }
           
-          // Calculate total price
-          const totalPrice = (installmentData.downPayment || 0) + (installmentData.remainingAmount || 0);
+          // Use the original car price (priceToSell) - same as shown in the installments list
+          const carPrice = carData.priceToSell || 0;
           
           const normalizedInstallment = {
             id: installmentId,
@@ -95,7 +95,7 @@ export default function InstallmentDetails() {
             passportNumber: buyer.passport || "",
             phoneNumber: buyer.phone || "",
             email: buyer.email || "",
-            carPrice: totalPrice,
+            carPrice: carPrice,
             downPayment: installmentData.downPayment || 0,
             monthlyPayment: installmentData.monthlyPayment || summaryData.monthlyPayment || 0,
             installmentPeriod: months,
@@ -219,6 +219,12 @@ export default function InstallmentDetails() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Installment Details</h2>
+            <Link 
+              href={`/admin/edit-installment/${installmentId}`}
+              className="bg-black/20 backdrop-blur-md text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-black/30 hover:text-red-500 text-base sm:text-lg font-medium border border-white/30 transition-all duration-200 cursor-pointer"
+            >
+              Edit Installment
+            </Link>
           </div>
 
           {/* Installment Details Cards */}
@@ -287,10 +293,6 @@ export default function InstallmentDetails() {
                   <div>
                     <p className="text-sm text-gray-300">License Plate</p>
                     <p className="text-white text-lg font-medium">{installment.licensePlate || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-300">Car List No.</p>
-                    <p className="text-white text-lg font-medium">{installment.carListNo || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-300">Purchased Date</p>
@@ -389,6 +391,11 @@ export default function InstallmentDetails() {
                       
                       const isPaid = paidMonths.has(monthNumber);
                       
+                      // Find penalty fee from payment history
+                      const paymentRecord = installment.paymentHistory?.find(p => p.month === monthNumber);
+                      const penaltyFee = paymentRecord?.penaltyFee || 0;
+                      const totalAmount = paymentAmount + penaltyFee;
+                      
                       return (
                         <div 
                           key={monthNumber} 
@@ -407,10 +414,26 @@ export default function InstallmentDetails() {
                                 {isPaid ? 'Paid' : 'Pending'}
                               </span>
                             </div>
-                            <p className="text-white text-lg font-bold mb-2">
+                            <p className="text-white text-base font-semibold mb-1">
                               ฿{paymentAmount.toLocaleString()}
                             </p>
-                            <p className="text-xs text-gray-400 mb-2">
+                            {penaltyFee > 0 && (
+                              <div className="mb-2">
+                                <p className="text-xs text-gray-400">Penalty Fee</p>
+                                <p className="text-red-400 text-sm font-semibold">
+                                  +฿{penaltyFee.toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                            {penaltyFee > 0 && (
+                              <div className="pt-2 border-t border-gray-600">
+                                <p className="text-xs text-gray-400">Total Paid</p>
+                                <p className="text-green-400 text-lg font-bold">
+                                  ฿{totalAmount.toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                            <p className="text-xs text-gray-400 mt-2">
                               Due: {dueDate.toLocaleDateString('en-GB')}
                             </p>
                           </div>
@@ -463,8 +486,8 @@ export default function InstallmentDetails() {
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">Date</th>
                         <th className="px-4 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">Amount</th>
-                        <th className="px-4 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">Month</th>
-                        <th className="px-4 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">Payment Method</th>
+                        <th className="px-4 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">Penalty Fee</th>
+                        <th className="px-4 py-3 text-left text-sm font-bold text-white uppercase tracking-wider">Total</th>
                       </tr>
                     </thead>
                     <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
@@ -478,17 +501,25 @@ export default function InstallmentDetails() {
                             formattedDate = paymentDate;
                           }
                         }
+                        const penaltyFee = payment.penaltyFee || 0;
+                        const amount = payment.amount || 0;
+                        const total = amount + penaltyFee;
+                        
                         return (
                           <tr key={index} className="hover:bg-black/30">
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-white">{formattedDate}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-green-400 font-semibold">
-                              ฿{(payment.amount || 0).toLocaleString()}
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-white font-semibold">
+                              ฿{amount.toLocaleString()}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
-                              {payment.month ? `Month ${payment.month}` : 'N/A'}
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold">
+                              {penaltyFee > 0 ? (
+                                <span className="text-red-400">฿{penaltyFee.toLocaleString()}</span>
+                              ) : (
+                                <span className="text-gray-500">-</span>
+                              )}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
-                              {payment.paymentMethod || payment.method || 'N/A'}
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-green-400 font-bold">
+                              ฿{total.toLocaleString()}
                             </td>
                           </tr>
                         );

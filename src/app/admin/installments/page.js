@@ -63,13 +63,12 @@ export default function InstallmentsPage() {
           const installment = car.installment || {};
           const buyer = installment.buyer || {};
           
-          // Calculate total price (downPayment + remainingAmount)
-          const totalPrice = (installment.downPayment || 0) + (installment.remainingAmount || 0);
-          
-          // Calculate monthly payment (remainingAmount / months)
+          // Get months and monthly payment from installment
           const months = installment.months || 0;
-          const remainingAmount = installment.remainingAmount || 0;
-          const monthlyPayment = months > 0 ? remainingAmount / months : 0;
+          const monthlyPayment = installment.monthlyPayment || 0;
+          
+          // Use the original car price (priceToSell) - this is what's shown in the "Add New Installment" modal
+          const carPrice = car.priceToSell || 0;
           
           // Format start date
           const startDate = installment.startDate 
@@ -87,9 +86,9 @@ export default function InstallmentsPage() {
             passportNumber: buyer.passport || '',
             phoneNumber: buyer.phone || '',
             email: buyer.email || '',
-            carPrice: totalPrice,
+            carPrice: carPrice,
             downPayment: installment.downPayment || 0,
-            monthlyPayment: car.installmentMonthlyPayment,
+            monthlyPayment: monthlyPayment,
             installmentPeriod: months,
             purchasedDate: startDate,
             carListNo: car.carList || '',
@@ -209,15 +208,12 @@ export default function InstallmentsPage() {
                     <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">
-                      Action
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
                   {loading ? (
                     <tr>
-                      <td colSpan="10" className="px-6 py-12 text-center text-white/70">
+                      <td colSpan="9" className="px-6 py-12 text-center text-white/70">
                         Loading installments...
                       </td>
                     </tr>
@@ -267,20 +263,11 @@ export default function InstallmentsPage() {
                         <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white cursor-pointer" onClick={() => window.location.href = `/admin/installment-details/${installment.id}`}>
                           {installment.purchasedDate || 'N/A'}
                         </td>
-                        <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">
-                          <Link 
-                            href={`/admin/edit-installment/${installment.id}`} 
-                            onClick={(e) => e.stopPropagation()} // Prevent row click when clicking Edit button
-                            className="bg-black/20 backdrop-blur-md text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded text-xs sm:text-sm hover:bg-black/30 hover:text-red-500 font-medium border border-white/30 transition-all duration-200 cursor-pointer"
-                          >
-                            Edit
-                          </Link>
-                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="10" className="px-6 py-12 text-center text-white/70">
+                      <td colSpan="9" className="px-6 py-12 text-center text-white/70">
                         No installments found. Add cars from the Add New Car page or create new installments here.
                       </td>
                     </tr>

@@ -56,7 +56,7 @@ export default function InstallmentDetails() {
           if (response.status === 404) {
             const errorData = await response.json().catch(() => ({}));
             alert(errorData.message || "Car or installment not found");
-            setLoading(false);
+          setLoading(false);
             return;
           }
           throw new Error(`Request failed with status ${response.status}`);
@@ -135,7 +135,7 @@ export default function InstallmentDetails() {
             setOwnerBookStatus('ready');
           } else if (summaryData.paymentProgress >= 100) {
             setOwnerBookStatus('ready');
-          } else {
+        } else {
             setOwnerBookStatus('pending');
           }
         }
@@ -376,11 +376,11 @@ export default function InstallmentDetails() {
                             dueDate.setTime(parsedDate.getTime());
                           } else {
                             // Fallback to DD/MM/YYYY format
-                            const [day, month, year] = installment.purchasedDate.split('/');
+                        const [day, month, year] = installment.purchasedDate.split('/');
                             if (day && month && year) {
-                              dueDate.setDate(parseInt(day));
-                              dueDate.setMonth(parseInt(month) - 1); // Month is 0-indexed
-                              dueDate.setFullYear(parseInt(year));
+                        dueDate.setDate(parseInt(day));
+                        dueDate.setMonth(parseInt(month) - 1); // Month is 0-indexed
+                        dueDate.setFullYear(parseInt(year));
                             }
                           }
                         } catch (e) {
@@ -406,13 +406,13 @@ export default function InstallmentDetails() {
                           <div className="text-center">
                             <div className="flex items-center justify-center gap-2 mb-2">
                               <p className="text-sm text-gray-300">Month {monthNumber}</p>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                isPaid 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {isPaid ? 'Paid' : 'Pending'}
-                              </span>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  isPaid 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {isPaid ? 'Paid' : 'Pending'}
+                                </span>
                             </div>
                             <p className="text-white text-base font-semibold mb-1">
                               ฿{paymentAmount.toLocaleString()}

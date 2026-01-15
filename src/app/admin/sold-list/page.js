@@ -100,11 +100,11 @@ export default function SoldListPage() {
           // Get buyer info from sale or installment
           const buyer = car.sale?.buyer || car.installment?.buyer || null;
           
-          // Get sold price: from sale.price or calculated from installment
+          // Get sold price: from sale.price or priceToSell for installment
           const soldPrice = isPaidSale 
             ? (typeof car.sale.price === 'number' ? Math.round(car.sale.price) : car.sale.price)
             : isInstallment 
-              ? Math.round((car.installment.downPayment || 0) + (car.installment.remainingAmount || 0))
+              ? (typeof car.priceToSell === 'number' ? Math.round(car.priceToSell) : car.priceToSell)
               : null;
           
           // Get sold date: from sale.date or installment.startDate
@@ -168,9 +168,7 @@ export default function SoldListPage() {
   }, [API_BASE_URL]);
 
   const handleTransferMark = async (car) => {
-    if (window.confirm(`Mark the sale of ${car.brand} ${car.model} (${car.licenseNo}) as completed? This indicates the ownership transfer is finalized.`)) {
-      const transferDate = new Date().toLocaleDateString('en-GB');
-      
+    if (window.confirm(`Transfer the owner book for ${car.brand} ${car.model} (${car.licenseNo})?`)) {
       // Update API if available
       if (API_BASE_URL && car.id) {
         try {
@@ -183,40 +181,30 @@ export default function SoldListPage() {
             headers['Authorization'] = `Bearer ${token}`;
           }
           
-          const response = await fetch(`${API_BASE_URL}/api/car/${car.id}`, {
+          const response = await fetch(`${API_BASE_URL}/api/car/${car.id}/owner-book-transfer`, {
             method: 'PUT',
             headers: headers,
-            body: JSON.stringify({
-              transferCompleted: true,
-              transferDate: transferDate
-            })
+            body: JSON.stringify({ notes: "" })
           });
           
-          if (!response.ok) {
-            console.error("Failed to update car in API:", response.status);
-            // Continue with localStorage update as fallback
+          const result = await response.json().catch(() => ({}));
+          
+          if (!response.ok || result.success === false) {
+            const message = result.message || result.error || `Request failed with status ${response.status}`;
+            alert(`Failed to transfer owner book: ${message}`);
+            return;
           }
+          
+          // Success - reload the page to show updated data
+          alert('✅ Owner book transferred successfully!');
+          window.location.reload();
         } catch (error) {
-          console.error("Error updating car in API:", error);
-          // Continue with localStorage update as fallback
+          console.error("Error transferring owner book:", error);
+          alert(`Error: ${error.message || "Failed to transfer owner book"}`);
         }
+      } else {
+        alert("API base URL is not configured.");
       }
-      
-      // Update local state and localStorage
-      const updatedSoldCars = soldCars.map(c => {
-        if (c.id === car.id) {
-          return {
-            ...c,
-            transferCompleted: true,
-            transferDate: transferDate
-          };
-        }
-        return c;
-      });
-      
-      setSoldCars(updatedSoldCars);
-      localStorage.setItem('soldCars', JSON.stringify(updatedSoldCars));
-      alert('Sale marked as completed! Ownership transfer is finalized.');
     }
   };
 
@@ -473,7 +461,7 @@ export default function SoldListPage() {
                           })()}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">
-                          {car.transferCompleted ? (
+                          {car.ownerBookTransfer && car.ownerBookTransfer.transferred ? (
                             <span className="bg-green-600/20 backdrop-blur-md text-green-400 px-2 sm:px-4 py-1.5 sm:py-2 rounded text-xs sm:text-sm font-medium border border-green-500/30">
                               ✅ Completed
                             </span>
@@ -483,9 +471,9 @@ export default function SoldListPage() {
                                 e.stopPropagation(); // Prevent row click
                                 handleTransferMark(car);
                               }}
-                              className="bg-black/20 backdrop-blur-md text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded text-xs sm:text-sm hover:bg-black/30 hover:text-blue-500 font-medium border border-white/30 transition-all duration-200 cursor-pointer"
+                              className="bg-black/20 backdrop-blur-md text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded text-xs sm:text-sm hover:bg-black/30 hover:text-green-500 font-medium border border-white/30 transition-all duration-200 cursor-pointer"
                             >
-                              Name Transfer
+                              Transfer Owner Book
                             </button>
                           )}
                         </td>

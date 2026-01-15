@@ -400,7 +400,7 @@ export default function EditInstallment() {
       console.error("Failed to reset payment:", error);
       alert(`Failed to reset payment: ${error.message || 'An unexpected error occurred. Please try again.'}`);
     }
-  };
+    };
 
   // Mark car as sold / owner book transferred (moves to Sold List)
   const handleTransferOwnerBook = async () => {
@@ -409,11 +409,8 @@ export default function EditInstallment() {
       return;
     }
 
-    if (
-      !window.confirm(
-        "Are you sure you want to transfer the owner book and move this car to the Sold List?"
-      )
-    ) {
+    // Confirm transfer
+    if (!window.confirm("Are you sure you want to transfer the owner book?")) {
       return;
     }
 
@@ -429,11 +426,11 @@ export default function EditInstallment() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/api/car/${installmentId}/sell`,
+        `${API_BASE_URL}/api/car/${installmentId}/owner-book-transfer`,
         {
           method: "PUT",
           headers,
-          body: JSON.stringify({ source: "installment" }),
+          body: JSON.stringify({ notes: "" }),
         }
       );
 
@@ -450,10 +447,12 @@ export default function EditInstallment() {
 
       // Update UI status
       setOwnerBookStatus("transferred");
-      setBulkActionMessage("Owner book transferred and car moved to Sold List.");
+      setBulkActionMessage("✅ Owner book transferred successfully!");
 
-      // Redirect to Sold List for clarity
-      router.push("/admin/sold-list");
+      // Refresh the page to show updated status
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (error) {
       console.error("Failed to transfer owner book:", error);
       alert(
@@ -972,7 +971,7 @@ export default function EditInstallment() {
                                       e.stopPropagation();
                                       if (!isDisabled && !isPaid) {
                                         handleMonthlyPayment(monthNumber);
-                                      }
+                                        }
                                     }}
                                     className={isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
                                   >
@@ -990,8 +989,8 @@ export default function EditInstallment() {
                                 <div className="mb-2">
                                   <p className="text-xs text-gray-400 mb-1">Monthly Payment</p>
                                   <p className={`text-lg font-bold ${isDisabled ? 'text-gray-500' : 'text-white'}`}>
-                                    {formatCurrency(parseInt(formData.monthlyPayment) || 0)}
-                                  </p>
+                                  {formatCurrency(parseInt(formData.monthlyPayment) || 0)}
+                                </p>
                                 </div>
                                 
                                 {!isPaid && !isDisabled && (
@@ -1005,10 +1004,10 @@ export default function EditInstallment() {
                                     <div className="flex gap-1">
                                       <div className="flex-1 relative">
                                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">฿</span>
-                                        <input
+                                    <input
                                           type="text"
                                           inputMode="numeric"
-                                          value={penaltyFees[monthNumber] || ''}
+                                      value={penaltyFees[monthNumber] || ''}
                                           onChange={(e) => {
                                             const value = e.target.value;
                                             // Allow only numbers and empty string
@@ -1016,9 +1015,9 @@ export default function EditInstallment() {
                                               handlePenaltyFeeChange(monthNumber, value);
                                             }
                                           }}
-                                          placeholder="0"
+                                      placeholder="0"
                                           className="w-full pl-6 pr-2 py-2 text-sm border border-red-400 rounded-md bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                                          onClick={(e) => e.stopPropagation()}
+                                      onClick={(e) => e.stopPropagation()}
                                           onFocus={(e) => {
                                             e.stopPropagation();
                                             e.target.select();
@@ -1030,8 +1029,8 @@ export default function EditInstallment() {
                                               e.target.blur();
                                             }
                                           }}
-                                        />
-                                      </div>
+                                    />
+                                  </div>
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -1149,7 +1148,7 @@ export default function EditInstallment() {
                             type="button"
                                 onClick={handleTransferOwnerBook}
                                 className="px-4 py-1.5 rounded-md text-sm font-medium cursor-pointer transition-colors border border-green-400 bg-green-500/10 text-green-200 hover:bg-green-500/20"
-                              >
+                          >
                                 Transfer
                           </button>
                             )}

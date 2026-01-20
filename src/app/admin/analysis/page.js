@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 
 export default function AnalysisPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
-  const [analysisType, setAnalysisType] = useState('all'); // 'all', 'installment', or 'paid'
   const [profitData, setProfitData] = useState({
     monthly: [],
     sixMonths: [],
@@ -25,7 +24,7 @@ export default function AnalysisPage() {
       return;
     }
 
-    const fetchProfitAnalysis = async (period, type) => {
+    const fetchProfitAnalysis = async (period) => {
       if (!API_BASE_URL) {
         console.warn("API base URL is not set. Cannot fetch profit analysis.");
         setLoading(false);
@@ -48,16 +47,8 @@ export default function AnalysisPage() {
         // Convert frontend period to backend period format
         const apiPeriod = period === 'sixMonths' ? '6months' : period;
         
-        // Choose API endpoint based on analysis type
-        let endpoint = `${API_BASE_URL}/api/analysis/profit?period=${apiPeriod}`;
-        if (type === 'installment') {
-          endpoint = `${API_BASE_URL}/api/analysis/profit/installment?period=${apiPeriod}`;
-        } else if (type === 'paid') {
-          endpoint = `${API_BASE_URL}/api/analysis/profit/paid?period=${apiPeriod}`;
-        }
-        
         // Fetch profit analysis from API with period parameter
-        const response = await fetch(endpoint, {
+        const response = await fetch(`${API_BASE_URL}/api/analysis/profit?period=${apiPeriod}`, {
           cache: "no-store",
           headers: headers
         });
@@ -104,9 +95,9 @@ export default function AnalysisPage() {
       }
     };
 
-    // Fetch data for the selected period and analysis type
-    fetchProfitAnalysis(selectedPeriod, analysisType);
-  }, [API_BASE_URL, selectedPeriod, analysisType]);
+    // Fetch data for the selected period
+    fetchProfitAnalysis(selectedPeriod);
+  }, [API_BASE_URL, selectedPeriod]);
 
   // Group cars data by period for display
   const groupDataByPeriod = (cars, period) => {
@@ -223,9 +214,6 @@ export default function AnalysisPage() {
       const periodText = selectedPeriod === 'monthly' ? 'Last 12 Months' : 
                         selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years';
       const periodLabel = selectedPeriod === 'yearly' ? 'Year' : 'Month';
-      const analysisTypeText = analysisType === 'all' ? 'All Sales (Cash + Installment)' : 
-                              analysisType === 'installment' ? 'Installment Sales Only' : 
-                              'Paid Sales Only (Cash)';
       const groupedData = getCurrentData();
       
       // Create CSV content with BOM for Excel UTF-8 support
@@ -233,7 +221,6 @@ export default function AnalysisPage() {
       
       // Header Section
       csvContent += `BKK KAUNG PYAE CAR SHOWROOM - Profit Analysis Report\n`;
-      csvContent += `Analysis Type: ${analysisTypeText}\n`;
       csvContent += `Period: ${periodText}\n`;
       csvContent += `Generated: ${new Date().toLocaleString()}\n`;
       csvContent += `\n`;
@@ -274,9 +261,7 @@ export default function AnalysisPage() {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
       const dateStr = new Date().toISOString().split('T')[0];
-      const typeStr = analysisType === 'all' ? 'All' : 
-                     analysisType === 'installment' ? 'Installment' : 'Paid';
-      link.setAttribute('download', `BKK_Profit_Analysis_${typeStr}_${selectedPeriod}_${dateStr}.csv`);
+      link.setAttribute('download', `BKK_Profit_Analysis_${selectedPeriod}_${dateStr}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -299,9 +284,6 @@ export default function AnalysisPage() {
       const periodText = selectedPeriod === 'monthly' ? 'Last 12 Months' : 
                         selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years';
       const periodLabel = selectedPeriod === 'yearly' ? 'Year' : 'Month';
-      const analysisTypeText = analysisType === 'all' ? 'All Sales (Cash + Installment)' : 
-                              analysisType === 'installment' ? 'Installment Sales Only' : 
-                              'Paid Sales Only (Cash)';
       
       // Format date for display
       const formatDate = (dateString) => {
@@ -445,9 +427,6 @@ export default function AnalysisPage() {
           </div>
           
           <div class="info">
-            <div class="info-item">
-              <strong>Analysis Type:</strong> ${analysisTypeText}
-            </div>
             <div class="info-item">
               <strong>Period:</strong> ${periodText}
             </div>
@@ -623,14 +602,7 @@ export default function AnalysisPage() {
           ) : (
             <>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
-            <div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Profit Analysis</h2>
-              <p className="text-gray-400 text-sm mt-1">
-                {analysisType === 'all' ? 'All sales (Cash + Installment)' : 
-                 analysisType === 'installment' ? 'Installment sales only' : 
-                 'Paid sales only (Cash)'}
-              </p>
-            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Profit Analysis</h2>
             
             <div className="flex flex-col sm:flex-row gap-3">
               {/* Export Buttons */}
@@ -690,42 +662,6 @@ export default function AnalysisPage() {
                   Yearly
                 </button>
               </div>
-            </div>
-          </div>
-          
-          {/* Analysis Type Toggle - Three-way selector */}
-          <div className="flex justify-center mb-6 sm:mb-8">
-            <div className="bg-black/30 backdrop-blur-md rounded-lg p-1 inline-flex">
-              <button
-                onClick={() => setAnalysisType('all')}
-                className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-md transition-all cursor-pointer ${
-                  analysisType === 'all' 
-                    ? 'bg-red-600 text-white shadow-lg' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                All Sales
-              </button>
-              <button
-                onClick={() => setAnalysisType('installment')}
-                className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-md transition-all cursor-pointer ${
-                  analysisType === 'installment' 
-                    ? 'bg-red-600 text-white shadow-lg' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                Installment Only
-              </button>
-              <button
-                onClick={() => setAnalysisType('paid')}
-                className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-md transition-all cursor-pointer ${
-                  analysisType === 'paid' 
-                    ? 'bg-red-600 text-white shadow-lg' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                Paid Only
-              </button>
             </div>
           </div>
           

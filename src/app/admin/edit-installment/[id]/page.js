@@ -449,10 +449,10 @@ export default function EditInstallment() {
       setOwnerBookStatus("transferred");
       setBulkActionMessage("✅ Owner book transferred successfully!");
 
-      // Refresh the page to show updated status
+      // After transfer, navigate to Sold List
       setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+        router.push("/admin/sold-list");
+      }, 800);
     } catch (error) {
       console.error("Failed to transfer owner book:", error);
       alert(
@@ -633,6 +633,14 @@ export default function EditInstallment() {
         <Link href={`/admin/installment-details/${installmentId}`} className="text-white/80 hover:text-white text-sm font-medium transition-colors">
           ← Back to Details
         </Link>
+        <div className="mt-2">
+          <Link
+            href="/admin/dashboard"
+            className="text-white/80 hover:text-white text-sm font-medium transition-colors"
+          >
+            ← Back to Dashboard
+          </Link>
+        </div>
       </div>
 
       {/* Main Content */}

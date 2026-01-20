@@ -179,7 +179,7 @@ export default function InstallmentCalculatorPage() {
                         setFormData({...formData, carValue: value});
                       }
                     }}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base placeholder:text-gray-400"
                     placeholder="100000"
                     required
                   />
@@ -195,7 +195,7 @@ export default function InstallmentCalculatorPage() {
                     step="0.1"
                     value={formData.vatPercent}
                     onChange={(e) => setFormData({...formData, vatPercent: e.target.value})}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base placeholder:text-gray-400"
                     placeholder="7"
                     required
                     disabled
@@ -215,7 +215,7 @@ export default function InstallmentCalculatorPage() {
                         setFormData({...formData, financeFees: value});
                       }
                     }}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base placeholder:text-gray-400"
                     placeholder="0"
                   />
                 </div>
@@ -254,8 +254,8 @@ export default function InstallmentCalculatorPage() {
                         setFormData({...formData, downPaymentAmount: value});
                       }
                     }}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base"
-                    placeholder="50000"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base placeholder:text-gray-400"
+                    placeholder="0"
                     required
                   />
                 </div>
@@ -273,7 +273,7 @@ export default function InstallmentCalculatorPage() {
                         setFormData({...formData, interestPerMonth: value});
                       }
                     }}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base placeholder:text-gray-400"
                     placeholder="2.5"
                     required
                   />
@@ -292,8 +292,8 @@ export default function InstallmentCalculatorPage() {
                         setFormData({...formData, installmentMonths: value});
                       }
                     }}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base"
-                    placeholder="48"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white text-black text-sm sm:text-base placeholder:text-gray-400"
+                    placeholder="12"
                     required
                   />
                 </div>

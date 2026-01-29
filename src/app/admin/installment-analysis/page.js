@@ -14,6 +14,13 @@ export default function InstallmentAnalysis() {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+  const toNumber = (value) => {
+    if (value === null || value === undefined || value === "") return 0;
+    if (typeof value === "number") return value;
+    const parsed = parseFloat(String(value).replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const handleLogout = () => {
     window.location.href = '/admin/login';
   };
@@ -32,14 +39,65 @@ export default function InstallmentAnalysis() {
       car?.soldOutDate ??
       car?.soldDate ??
       car?.saleDate ??
+      car?.sale?.date ??
+      car?.sale?.soldDate ??
       car?.installmentStartDate ??
+      car?.installment?.startDate ??
       car?.startDate ??
       car?.date ??
       null;
 
     if (!candidate) return null;
+
+    // Support common non-ISO formats like "DD/MM/YYYY" (often used in UI strings)
+    // because `new Date("27/01/2026")` is not reliably parsed across browsers.
+    if (typeof candidate === "string") {
+      const s = candidate.trim();
+      const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // DD/MM/YYYY
+      if (m1) {
+        const [, dd, mm, yyyy] = m1;
+        const dt = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      }
+      const m2 = s.match(/^(\d{2})-(\d{2})-(\d{4})$/); // DD-MM-YYYY
+      if (m2) {
+        const [, dd, mm, yyyy] = m2;
+        const dt = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      }
+    }
+
     const dt = new Date(candidate);
     return Number.isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const normalizeReportCar = (car) => {
+    // Make frontend tolerant to backend shape changes.
+    // Ensures charts + stats always receive numeric `profit` and `soldPrice`.
+    const normalized = { ...(car || {}) };
+
+    const derivedSoldPrice =
+      car?.soldPrice ??
+      car?.priceToSell ??
+      car?.salePrice ??
+      car?.sellingPrice ??
+      car?.installment?.priceToSell ??
+      car?.installment?.soldPrice ??
+      car?.sale?.price ??
+      null;
+
+    const derivedProfit =
+      car?.profit ??
+      car?.sale?.profit ??
+      car?.installment?.profit ??
+      null;
+
+    normalized.soldPrice = toNumber(derivedSoldPrice);
+    normalized.profit = toNumber(derivedProfit);
+    normalized.purchasePrice = toNumber(car?.purchasePrice ?? car?.priceToBuy ?? car?.originalPrice ?? 0);
+    normalized.totalRepairs = toNumber(car?.totalRepairs ?? car?.repairsTotal ?? car?.repairCostTotal ?? 0);
+
+    return normalized;
   };
 
   const groupDataByPeriod = (cars, period) => {
@@ -66,7 +124,7 @@ export default function InstallmentAnalysis() {
         };
       }
 
-      grouped[key].profit += car?.profit || 0;
+      grouped[key].profit += toNumber(car?.profit);
       grouped[key].soldCars += 1;
       grouped[key].totalCars += 1;
     });
@@ -126,7 +184,7 @@ export default function InstallmentAnalysis() {
   const getTotalProfit = () => (typeof totalProfit === "number" ? totalProfit : 0);
   const getTotalCars = () => (typeof count === "number" && count > 0 ? count : carsData.length);
   const getTotalSales = () =>
-    (carsData || []).reduce((total, car) => total + (Number(car?.soldPrice) || 0), 0);
+    (carsData || []).reduce((total, car) => total + toNumber(car?.soldPrice), 0);
 
   const exportToExcel = async () => {
     try {
@@ -352,11 +410,19 @@ export default function InstallmentAnalysis() {
         const data = await response.json();
 
         if (data?.success) {
-          setCarsData(data.cars || []);
-          setTotalProfit(data.totalProfit || 0);
-          setCount(typeof data.count === "number" ? data.count : (data.cars || []).length);
+          const normalizedCars = (data.cars || []).map(normalizeReportCar);
+          setCarsData(normalizedCars);
 
-          const grouped = groupDataByPeriod(data.cars || [], apiPeriod);
+          const derivedTotalProfit = toNumber(data.totalProfit);
+          const safeTotalProfit =
+            Number.isFinite(derivedTotalProfit) && derivedTotalProfit !== 0
+              ? derivedTotalProfit
+              : normalizedCars.reduce((sum, c) => sum + toNumber(c?.profit), 0);
+          setTotalProfit(safeTotalProfit);
+
+          setCount(typeof data.count === "number" ? data.count : normalizedCars.length);
+
+          const grouped = groupDataByPeriod(normalizedCars, apiPeriod);
           const stateKey = period === "sixMonths" ? "sixMonths" : period;
           setProfitData((prev) => ({ ...prev, [stateKey]: grouped }));
         }
@@ -426,7 +492,7 @@ export default function InstallmentAnalysis() {
             </div>
           ) : (
             <>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Installment Profit Analysis</h2>
 
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -465,7 +531,7 @@ export default function InstallmentAnalysis() {
                       }`}
                     >
                       6 Months
-                    </button>
+              </button>
                     <button
                       onClick={() => setSelectedPeriod("yearly")}
                       className={`px-3 sm:px-4 py-2 text-sm sm:text-base font-medium rounded-md transition-all cursor-pointer ${
@@ -473,12 +539,12 @@ export default function InstallmentAnalysis() {
                       }`}
                     >
                       Yearly
-                    </button>
+              </button>
                   </div>
-                </div>
-              </div>
+            </div>
+          </div>
 
-              {/* Stats Cards */}
+          {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
                   <div className="text-sm sm:text-base font-medium text-gray-300">Total Profit</div>
@@ -522,36 +588,36 @@ export default function InstallmentAnalysis() {
                             title={`${period}: ฿${item.profit.toLocaleString()}`}
                           />
                           <div className="text-xs text-gray-400 mt-2 text-center">
-                            ฿{item.profit > 1000 ? `${(item.profit / 1000).toFixed(1)}k` : item.profit.toFixed(0)}
-                          </div>
-                        </div>
+                            ฿{toNumber(item.profit) > 1000 ? `${(toNumber(item.profit) / 1000).toFixed(1)}k` : toNumber(item.profit).toFixed(0)}
+            </div>
+            </div>
                       );
                     })}
-                  </div>
-                </div>
-              </div>
+            </div>
+            </div>
+          </div>
 
               {/* Period Breakdown Table */}
-              <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md mb-6 sm:mb-8">
-                <div className="px-4 sm:px-6 py-4 sm:py-6">
+          <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md mb-6 sm:mb-8">
+            <div className="px-4 sm:px-6 py-4 sm:py-6">
                   <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Period Breakdown</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-600">
-                      <thead className="bg-black/20 backdrop-blur-2xl">
-                        <tr>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-600">
+                  <thead className="bg-black/20 backdrop-blur-2xl">
+                    <tr>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Period</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Profit</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Cars</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Avg Profit</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
+                    </tr>
+                  </thead>
+                  <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
                         {currentData.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="px-3 sm:px-6 py-6 text-center text-white">
                               No data
-                            </td>
-                          </tr>
+                      </td>
+                    </tr>
                         ) : (
                           currentData.map((item, idx) => {
                             const period = selectedPeriod === "yearly" ? item.year : item.month;
@@ -561,27 +627,27 @@ export default function InstallmentAnalysis() {
                                 <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{period}</td>
                                 <td className={`px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base font-semibold ${item.profit >= 0 ? "text-green-400" : "text-red-400"}`}>
                                   ฿{(item.profit || 0).toLocaleString()}
-                                </td>
+                      </td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{item.soldCars}</td>
                                 <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">฿{avgProfit.toLocaleString()}</td>
-                              </tr>
+                    </tr>
                             );
                           })
                         )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                  </tbody>
+                </table>
               </div>
+            </div>
+          </div>
 
               {/* Car Details Table */}
-              <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md">
-                <div className="px-4 sm:px-6 py-4 sm:py-6">
+          <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md">
+            <div className="px-4 sm:px-6 py-4 sm:py-6">
                   <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Car Details</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-600">
-                      <thead className="bg-black/20 backdrop-blur-2xl">
-                        <tr>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-600">
+                  <thead className="bg-black/20 backdrop-blur-2xl">
+                    <tr>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">No</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">License No</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Brand</th>
@@ -589,20 +655,18 @@ export default function InstallmentAnalysis() {
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Sold</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Repairs</th>
                           <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Profit</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Date</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
+                    </tr>
+                  </thead>
+                  <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
                         {(carsData || []).length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-3 sm:px-6 py-6 text-center text-white">
+                            <td colSpan={7} className="px-3 sm:px-6 py-6 text-center text-white">
                               No cars in this period
-                            </td>
-                          </tr>
+                      </td>
+                    </tr>
                         ) : (
                           (carsData || []).map((car, idx) => {
                             const profit = Number(car?.profit) || 0;
-                            const dt = getReportDate(car);
                             return (
                               <tr key={car?.id || car?._id || idx} className="hover:bg-black/30 backdrop-blur-2xl">
                                 <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{idx + 1}</td>
@@ -613,17 +677,16 @@ export default function InstallmentAnalysis() {
                                 <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">฿{(car?.totalRepairs || 0).toLocaleString()}</td>
                                 <td className={`px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base font-semibold ${profit >= 0 ? "text-green-400" : "text-red-400"}`}>
                                   ฿{profit.toLocaleString()}
-                                </td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{formatDate(dt)}</td>
-                              </tr>
+                      </td>
+                    </tr>
                             );
                           })
                         )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                  </tbody>
+                </table>
               </div>
+            </div>
+          </div>
             </>
           )}
         </div>

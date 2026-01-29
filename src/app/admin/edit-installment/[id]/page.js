@@ -639,7 +639,7 @@ export default function EditInstallment() {
             className="text-white/80 hover:text-white text-sm font-medium transition-colors"
           >
             ← Back to Dashboard
-          </Link>
+        </Link>
         </div>
       </div>
 
@@ -1066,7 +1066,7 @@ export default function EditInstallment() {
                                     {confirmedPenalties[monthNumber] && (
                                       <div className="mt-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-center">
                                         <span className="text-green-400 text-xs font-medium">✓ Penalty fee added!</span>
-                                      </div>
+                                  </div>
                                     )}
                                     {penaltyFees[monthNumber] > 0 && !confirmedPenalties[monthNumber] && (
                                       <div className="mt-2 pt-2 border-t border-red-400/30">

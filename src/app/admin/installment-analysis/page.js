@@ -547,22 +547,69 @@ export default function InstallmentAnalysis() {
           {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
-                  <div className="text-sm sm:text-base font-medium text-gray-300">Total Profit</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalProfit().toLocaleString()}</div>
-                </div>
-                <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
-                  <div className="text-sm sm:text-base font-medium text-gray-300">Total Cars</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">{getTotalCars()}</div>
-                </div>
-                <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
-                  <div className="text-sm sm:text-base font-medium text-gray-300">Avg Profit/Car</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">
-                    ฿{getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : "0"}
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-3 sm:ml-4">
+                      <div className="text-sm sm:text-base font-medium text-gray-300">Total Profit</div>
+                      <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalProfit().toLocaleString()}</div>
+                    </div>
                   </div>
                 </div>
+
                 <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
-                  <div className="text-sm sm:text-base font-medium text-gray-300">Total Sales</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalSales().toLocaleString()}</div>
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-3 sm:ml-4">
+                      <div className="text-sm sm:text-base font-medium text-gray-300">Total Cars</div>
+                      <div className="text-2xl sm:text-3xl font-semibold text-white">{getTotalCars()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-3 sm:ml-4">
+                      <div className="text-sm sm:text-base font-medium text-gray-300">Avg Profit/Car</div>
+                      <div className="text-2xl sm:text-3xl font-semibold text-white">
+                        ฿{getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : "0"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-3 sm:ml-4">
+                      <div className="text-sm sm:text-base font-medium text-gray-300">Total Sales</div>
+                      <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalSales().toLocaleString()}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

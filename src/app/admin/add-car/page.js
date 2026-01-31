@@ -81,6 +81,11 @@ export default function AddCar() {
       case 'gear':
         if (!value) {
           error = 'Gear type is required';
+        } else {
+          const normalized = String(value).trim().toLowerCase();
+          if (normalized !== "automatic" && normalized !== "manual") {
+            error = 'Gear type must be either "Automatic" or "Manual"';
+          }
         }
         break;
       
@@ -252,11 +257,9 @@ export default function AddCar() {
           
           // Map gear values to backend expected format: "Manual" or "Automatic"
           let gearValue = formData.gear || '';
-          if (gearValue === 'Auto' || gearValue === 'CVT' || gearValue === 'Semi-Auto') {
-            gearValue = 'Automatic';
-          } else if (gearValue === 'Manual') {
-            gearValue = 'Manual';
-          }
+          if (gearValue === "Auto" || gearValue === "CVT" || gearValue === "Semi-Auto") gearValue = "Automatic";
+          if (String(gearValue).trim().toLowerCase() === "automatic") gearValue = "Automatic";
+          if (String(gearValue).trim().toLowerCase() === "manual") gearValue = "Manual";
           
           // Prepare numeric fields - send as numbers, not strings
           const priceToSellNum = formData.price ? parseInt(formData.price) : null;
@@ -887,9 +890,7 @@ export default function AddCar() {
                   >
                     <option value="">Select Gear Type</option>
                     <option value="Manual">Manual</option>
-                    <option value="Auto">Automatic</option>
-                    <option value="CVT">CVT</option>
-                    <option value="Semi-Auto">Semi-Automatic</option>
+                    <option value="Automatic">Automatic</option>
                   </select>
                   {fieldErrors.gear && (
                     <p className="mt-1 text-sm text-red-400">{fieldErrors.gear}</p>

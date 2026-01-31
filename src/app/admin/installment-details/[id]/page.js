@@ -165,6 +165,16 @@ export default function InstallmentDetails() {
     }).format(amount);
   };
 
+  const toNumber = (value) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (typeof value === "string") {
+      const cleaned = value.replace(/[^\d.-]/g, "");
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
 
 
   // Note: This is a read-only details page - no payment modifications allowed
@@ -444,7 +454,7 @@ export default function InstallmentDetails() {
                 
                 {/* Payment Summary */}
                 <div className="mt-6 p-4 bg-black/30 rounded-lg border border-gray-600">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="text-center">
                       <p className="text-sm text-gray-300">Monthly Payment</p>
                       <p className="text-white text-lg font-bold">
@@ -455,18 +465,6 @@ export default function InstallmentDetails() {
                       <p className="text-sm text-gray-300">Payments Made</p>
                       <p className="text-white text-lg font-bold">
                         {paymentSummary?.paymentsMade || paidMonths.size} / {installment.installmentPeriod || 0}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-300">Paid Amount</p>
-                      <p className="text-green-400 text-lg font-bold">
-                        ฿{(paymentSummary?.paidAmount || ((parseInt(installment.monthlyPayment) || 0) * paidMonths.size)).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-300">Remaining</p>
-                      <p className="text-yellow-400 text-lg font-bold">
-                        ฿{(paymentSummary?.remainingAmount || ((parseInt(installment.monthlyPayment) || 0) * ((parseInt(installment.installmentPeriod) || 0) - paidMonths.size))).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -501,9 +499,28 @@ export default function InstallmentDetails() {
                             formattedDate = paymentDate;
                           }
                         }
-                        const penaltyFee = payment.penaltyFee || 0;
-                        const amount = payment.amount || 0;
-                        const total = amount + penaltyFee;
+                        const penaltyFee = toNumber(payment.penaltyFee || 0);
+                        const rawAmount = toNumber(payment.amount || 0);
+                        const expectedMonthly = toNumber(installment.monthlyPayment || 0);
+
+                        // Our edit page currently posts: amount = (monthly + penalty) and penaltyFee separately.
+                        // Some older/back-end records might store amount = monthly only.
+                        // Detect which case we have to avoid double-counting in the UI.
+                        const amountLooksLikeTotal =
+                          penaltyFee > 0 &&
+                          expectedMonthly > 0 &&
+                          Math.abs(rawAmount - (expectedMonthly + penaltyFee)) < 1;
+
+                        const amountLooksLikeBase =
+                          penaltyFee > 0 &&
+                          expectedMonthly > 0 &&
+                          Math.abs(rawAmount - expectedMonthly) < 1;
+
+                        const amount = amountLooksLikeTotal
+                          ? Math.max(rawAmount - penaltyFee, 0)
+                          : rawAmount;
+
+                        const total = amountLooksLikeBase ? rawAmount + penaltyFee : rawAmount;
                         
                         return (
                           <tr key={index} className="hover:bg-black/30">

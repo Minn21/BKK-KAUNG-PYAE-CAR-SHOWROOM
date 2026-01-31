@@ -52,12 +52,52 @@ export default function CarDetails() {
             console.log('apiCar', apiCar);
             
             if (apiCar) {
+              const soldFlag = apiCar?.isAvailable === false;
+
               // Handle carPhoto - extract URL from image object array (always one object)
               const carPhotoUrl = apiCar.images?.[0]?.url || null;
+
+              const isPaidSale = apiCar.sale != null;
+              const isInstallment = apiCar.installment != null;
+              const buyer = apiCar.sale?.buyer || apiCar.installment?.buyer || null;
+
+              const rawSoldDate = isPaidSale
+                ? (apiCar.sale?.date || apiCar.sale?.soldDate)
+                : isInstallment
+                  ? apiCar.installment?.startDate
+                  : null;
+
+              let formattedSoldDate = "";
+              if (rawSoldDate) {
+                try {
+                  formattedSoldDate = new Date(rawSoldDate).toLocaleDateString("en-GB");
+                } catch {
+                  formattedSoldDate = String(rawSoldDate);
+                }
+              }
+
+              const soldPriceValue = isPaidSale
+                ? (apiCar.sale?.price ?? null)
+                : isInstallment
+                  ? (apiCar.priceToSell ?? null)
+                  : null;
+
+              const transferCompleted = Boolean(apiCar.ownerBookTransfer?.transferred);
+              const rawTransferDate = apiCar.ownerBookTransfer?.transferDate;
+              let formattedTransferDate = "";
+              if (rawTransferDate) {
+                try {
+                  formattedTransferDate = new Date(rawTransferDate).toLocaleDateString("en-GB");
+                } catch {
+                  formattedTransferDate = String(rawTransferDate);
+                }
+              }
               
               // Normalize the API response to match expected format
               const normalizedCar = {
                 id: apiCar.id || apiCar._id || carId,
+                isAvailable: apiCar.isAvailable,
+                boughtType: apiCar.boughtType,
                 licenseNo: apiCar.licenseNo || apiCar.licensePlate || apiCar.license || "",
                 brand: apiCar.brand || apiCar.make || "",
                 model: apiCar.model || apiCar.name || "",
@@ -70,17 +110,37 @@ export default function CarDetails() {
                       ? `฿${apiCar.priceToSell.toLocaleString()}` 
                       : apiCar.priceToSell)
                   : apiCar.price || "",
+                financeFee:
+                  apiCar.financeFee ??
+                  apiCar.financeFees ??
+                  apiCar.finance_fee ??
+                  apiCar.finance?.fee ??
+                  apiCar.finance?.financeFee ??
+                  "",
                 originalPrice: apiCar.originalPrice || apiCar.priceToBuy || apiCar.price || "",
                 year: apiCar.year || "",
                 purchasedKilo: apiCar.kilo || "",
                 repairHistory: apiCar.repairs || [],
                 carPhoto: carPhotoUrl,
                 carList: apiCar.carList || apiCar.carListNo || "",
-                sale: apiCar.sale ||  {}
+                sale: apiCar.sale || null,
+                installment: apiCar.installment || null,
+
+                // Fields used by the existing "Sale Information" UI (localStorage shape)
+                soldOutDate: formattedSoldDate,
+                soldPrice: soldPriceValue,
+                customerName: buyer?.name ?? "",
+                phoneNumber: buyer?.phone ?? "",
+                passportNumber: buyer?.passport ?? "",
+                transferCompleted: transferCompleted,
+                transferDate: formattedTransferDate,
+
+                // Optional profit field (some APIs may return this)
+                profit: apiCar.profit ?? apiCar.sale?.profit ?? apiCar.installment?.profit,
               };
               
               setCar(normalizedCar);
-              setIsSoldCar(false);
+              setIsSoldCar(soldFlag);
               setLoading(false);
               return;
             }
@@ -339,6 +399,7 @@ export default function CarDetails() {
                       src={carPhotoSrc} 
                       alt={`${car.brand} ${car.model}`}
                       className="w-full h-64 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      enableFullScreen={true}
                     />
                     {/* Debug info */}
                     <div className="text-xs text-gray-400 mt-2">
@@ -408,20 +469,18 @@ export default function CarDetails() {
                 </div>
               </div>
 
-              {/* Financial Information */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-white mb-4">Financial Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Selling Price</label>
-                    <p className="text-white text-lg font-semibold">{formatCurrency(car.price)}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Finance Fee</label>
-                    <p className="text-white text-lg font-semibold">{car.financeFee}</p>
+              {/* Financial Information (hide for sold cars) */}
+              {!isSoldCar && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-white mb-4">Financial Information</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Selling Price</label>
+                      <p className="text-white text-lg font-semibold">{formatCurrency(car.price)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Customer Information - Only show for sold cars */}
               {isSoldCar && (
@@ -470,7 +529,7 @@ export default function CarDetails() {
                   </div>
                   
                   {/* Profit/Loss Calculation */}
-                  {car.soldPrice && car.price && (
+                  {car.soldPrice !== null && car.soldPrice !== undefined && car.soldPrice !== "" && car.price && (
                     <div className="mt-6 p-4 bg-black/30 rounded-lg">
                       <h4 className="text-md font-semibold text-white mb-3">Profit Analysis</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -488,14 +547,57 @@ export default function CarDetails() {
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-1">Profit/Loss</label>
                           {(() => {
+                            // Match Sold List priority + formula:
+                            // 1) Profit Calculator saved value (if exists)
+                            // 2) car.profit (if backend provided)
+                            // 3) Basic: Profit = Sold Price - (Original Price + Finance Fee)
+                            try {
+                              const savedCalculations = JSON.parse(localStorage.getItem('profitCalculations') || '[]');
+                              const calc = savedCalculations.find((c) => c.carId === (car.id || carId));
+                              if (calc && typeof calc.profit === 'number') {
+                                const p = calc.profit;
+                                const profitFormatted = p >= 0 ? `฿${p.toLocaleString()}` : `-฿${Math.abs(p).toLocaleString()}`;
+                                const profitColor = p >= 0 ? 'text-green-400' : 'text-red-400';
+                                return (
+                                  <p className={`${profitColor} text-lg font-bold`} title={`From Profit Calculator (${calc.lastUpdated})`}>
+                                    {profitFormatted}
+                                  </p>
+                                );
+                              }
+                            } catch {
+                              // ignore localStorage parse errors
+                            }
+
+                            if (typeof car.profit === "number") {
+                              const p = car.profit;
+                              const profitFormatted = p >= 0 ? `฿${p.toLocaleString()}` : `-฿${Math.abs(p).toLocaleString()}`;
+                              const profitColor = p >= 0 ? 'text-green-400' : 'text-red-400';
+                              return (
+                                <p
+                                  className={`${profitColor} text-lg font-bold`}
+                                  title={`From backend (Original: ${formatCurrency(car.originalPrice || car.price)}, Sold: ${formatCurrency(car.soldPrice)}, Expenses: ${formatCurrency(car.financeFee || 0)})`}
+                                >
+                                  {profitFormatted}
+                                </p>
+                              );
+                            }
+
                             const originalPrice = parseCurrency(car.originalPrice || car.price);
-                            const soldPrice = typeof car.soldPrice === 'number' 
-                              ? car.soldPrice 
-                              : parseCurrency(car.soldPrice);
-                            const profit = soldPrice - originalPrice;
+                            const soldPrice = parseCurrency(car.soldPrice);
+                            const financeFee = car.financeFee ? parseCurrency(car.financeFee) : 0;
+                            const totalExpenses = financeFee;
+
+                            const profit = soldPrice - (originalPrice + totalExpenses);
                             const profitFormatted = profit >= 0 ? `฿${profit.toLocaleString()}` : `-฿${Math.abs(profit).toLocaleString()}`;
                             const profitColor = profit >= 0 ? 'text-green-400' : 'text-red-400';
-                            return <p className={`${profitColor} text-lg font-bold`}>{profitFormatted}</p>;
+                            return (
+                              <p
+                                className={`${profitColor} text-lg font-bold`}
+                                title={`Basic calculation (Original: ${formatCurrency(originalPrice)}, Sold: ${formatCurrency(soldPrice)}, Expenses: ${formatCurrency(totalExpenses)})`}
+                              >
+                                {profitFormatted}
+                              </p>
+                            );
                           })()}
                         </div>
                       </div>

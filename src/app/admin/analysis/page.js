@@ -38,7 +38,7 @@ export default function AnalysisPage() {
         const token = localStorage.getItem('token');
         
         const headers = {};
-        
+    
         // Add Authorization header if token exists
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -93,7 +93,7 @@ export default function AnalysisPage() {
         alert(`Failed to load profit analysis: ${error.message}`);
         setLoading(false);
       }
-    };
+  };
 
     // Fetch data for the selected period
     fetchProfitAnalysis(selectedPeriod);
@@ -149,11 +149,11 @@ export default function AnalysisPage() {
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const existing = result.find(r => r.month === monthKey);
         filled.unshift(existing || {
-          month: monthKey,
+        month: monthKey,
           profit: 0,
           soldCars: 0,
           totalCars: 0
-        });
+      });
       }
       return filled;
     }
@@ -161,7 +161,7 @@ export default function AnalysisPage() {
     // For yearly, fill in missing years
     if (period === 'yearly') {
       const filled = [];
-      for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 5; i++) {
         const year = (now.getFullYear() - i).toString();
         const existing = result.find(r => r.year === year);
         filled.unshift(existing || {
@@ -169,8 +169,8 @@ export default function AnalysisPage() {
           profit: 0,
           soldCars: 0,
           totalCars: 0
-        });
-      }
+      });
+    }
       return filled;
     }
 
@@ -476,10 +476,10 @@ export default function AnalysisPage() {
                 const period = selectedPeriod === 'yearly' ? item.year : item.month;
                 const avgProfit = item.totalCars > 0 ? (item.profit / item.totalCars) : 0;
                 return `
-                  <tr>
+                <tr>
                     <td>${period}</td>
                     <td class="profit-positive">฿${item.profit.toLocaleString()}</td>
-                    <td>${item.soldCars}</td>
+                  <td>${item.soldCars}</td>
                     <td>฿${avgProfit.toLocaleString()}</td>
                   </tr>
                 `;
@@ -515,7 +515,7 @@ export default function AnalysisPage() {
                     <td>฿${(car.totalRepairs || 0).toLocaleString()}</td>
                     <td class="${profitClass}">฿${profit.toLocaleString()}</td>
                     <td>${formatDate(car.soldOutDate)}</td>
-                  </tr>
+                </tr>
                 `;
               }).join('')}
             </tbody>

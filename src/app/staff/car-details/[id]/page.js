@@ -177,6 +177,7 @@ export default function StaffCarDetails() {
                       src={carPhotoSrc} 
                       alt={`${car.brand || ""} ${car.model || ""}`}
                       className="w-full h-64 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      enableFullScreen={true}
                     />
                     {showDebugInfo && (
                       <div className="text-xs text-gray-400 mt-2">

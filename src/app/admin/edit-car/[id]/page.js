@@ -1109,14 +1109,6 @@ export default function EditCar() {
                     {isSubmitting ? "Updating..." : "Update Car"}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleMarkAsSold}
-                  disabled={isSubmitting}
-                  className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 hover:text-red-200 disabled:bg-red-400 disabled:cursor-not-allowed text-base font-medium transition-all duration-200 cursor-pointer"
-                >
-                  Mark as Sold
-                </button>
               </div>
             </form>
           </div>

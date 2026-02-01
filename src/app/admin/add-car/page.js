@@ -7,18 +7,18 @@ import PhotoViewer from "@/app/components/PhotoViewer";
 export default function AddCar() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    licenseNo: "3276",
-    brand: "toyota",
-    model: "yaris",
-    engine: "1.2",
-    color: "grey",
+    licenseNo: "",
+    brand: "",
+    model: "",
+    engine: "",
+    color: "",
     wd: "",
-    gear: "Automatic",
-    price: "180000",
-    originalPrice: "160000",
-    year: "2014",
-    purchasedKilo: "210000",
-    purchaseDate: "2025-09-30",
+    gear: "",
+    price: "",
+    originalPrice: "",
+    year: "",
+    purchasedKilo: "",
+    purchaseDate: "",
     repairHistory: [],
     carPhoto: null
   });

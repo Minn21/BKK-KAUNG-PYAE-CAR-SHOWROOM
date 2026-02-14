@@ -5,6 +5,17 @@
   --foreground: #171717;
 }
 
+/* Increase overall text size across the app (scales Tailwind rem-based sizes). */
+html {
+  font-size: 18px;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 17px;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -19,10 +30,45 @@
   }
 }
 
+/*
+  Global "digits-only" font override:
+  This keeps your normal font (Orbitron) for letters, but renders numbers/currency
+  with a clearer numeric font everywhere (dashboard tables, cards, charts, etc.).
+*/
+@font-face {
+  font-family: "__numeric_override__";
+  src: local("Geist Mono"), local("SF Mono"), local("Menlo"), local("Monaco"), local("Consolas"),
+    local("Liberation Mono"), local("Courier New");
+  unicode-range:
+    U+0030-0039, /* 0-9 */
+    U+0E3F, /* ฿ Thai Baht sign */
+    U+002B, /* + */
+    U+002D, /* - */
+    U+2212, /* − */
+    U+002E, /* . */
+    U+002C, /* , */
+    U+0025, /* % */
+    U+002F, /* / */
+    U+003A, /* : */
+    U+0028-0029; /* ( ) */
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-orbitron), Arial, Helvetica, sans-serif;
+  font-family: "__numeric_override__", var(--font-orbitron), Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+@layer utilities {
+  /* Use a more legible font for numeric values (currency, totals, metrics). */
+  .font-numeric {
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
 }
 
 /* Remove tap highlight on mobile to avoid border-like flash on click */
@@ -39,6 +85,22 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Keep browser autofill from forcing white/yellow backgrounds */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(0, 0, 0, 0.3) inset;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 

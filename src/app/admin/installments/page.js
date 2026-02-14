@@ -159,6 +159,9 @@ export default function InstallmentsPage() {
             <Link href="/admin/installment-analysis" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
               Installment Analysis
             </Link>
+            <Link href="/admin/money-manager" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
+              Money Manager
+            </Link>
           </div>
         </div>
       </nav>

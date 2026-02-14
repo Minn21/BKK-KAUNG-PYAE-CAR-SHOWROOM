@@ -130,6 +130,9 @@ export default function InstallmentCalculatorPage() {
             <Link href="/admin/installment-analysis" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
               Installment Analysis
             </Link>
+            <Link href="/admin/money-manager" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
+              Money Manager
+            </Link>
           </div>
         </div>
       </nav>
@@ -334,16 +337,18 @@ export default function InstallmentCalculatorPage() {
                 <div className="space-y-4">
                   {/* Main Results */}
                   <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 sm:p-6 rounded-lg border border-red-200">
-                    <div className="text-3xl sm:text-4xl font-bold text-red-900 mb-2">฿{result.monthly_installment}</div>
+                    <div className="text-3xl sm:text-4xl font-bold text-red-900 mb-2 font-numeric">฿{result.monthly_installment}</div>
                     <div className="text-base sm:text-lg font-semibold text-red-700">Monthly Installment</div>
                     <div className="text-sm text-red-600 mt-1">Pay this amount for {formData.installmentMonths} months</div>
                   </div>
 
                   <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 sm:p-6 rounded-lg border border-blue-200">
-                    <div className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">฿{result.down_payment}</div>
-                    <div className="text-base sm:text-lg font-semibold text-blue-700">Down Payment (฿{formData.downPaymentAmount})</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2 font-numeric">฿{result.down_payment}</div>
+                    <div className="text-base sm:text-lg font-semibold text-blue-700">
+                      Down Payment (<span className="font-numeric">฿{formData.downPaymentAmount}</span>)
+                    </div>
                     <div className="text-sm text-blue-600 mt-1">Pay this exact amount upfront</div>
-                    <div className="text-xs text-blue-500 mt-1">({result.down_payment_percentage}% of total price)</div>
+                    <div className="text-xs text-blue-500 mt-1 font-numeric">({result.down_payment_percentage}% of total price)</div>
                   </div>
 
                   {/* Detailed Breakdown */}
@@ -352,48 +357,48 @@ export default function InstallmentCalculatorPage() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Car Value:</span>
-                        <span className="font-medium">฿{parseFloat(formData.carValue).toLocaleString()}</span>
+                        <span className="font-medium font-numeric">฿{parseFloat(formData.carValue).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">VAT ({formData.vatPercent}%):</span>
-                        <span className="font-medium">฿{(result.total_with_vat - formData.carValue).toFixed(2)}</span>
+                        <span className="font-medium font-numeric">฿{(result.total_with_vat - formData.carValue).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-800 font-medium">Total with VAT:</span>
-                        <span className="font-bold text-gray-900">฿{result.total_with_vat}</span>
+                        <span className="font-bold text-gray-900 font-numeric">฿{result.total_with_vat}</span>
                       </div>
                       {formData.financeFees && parseFloat(formData.financeFees) > 0 && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">Finance Fees:</span>
-                          <span className="font-medium">฿{formData.financeFees}</span>
+                          <span className="font-medium font-numeric">฿{formData.financeFees}</span>
                         </div>
                       )}
                       <div className="flex justify-between border-t pt-2">
                         <span className="text-gray-800 font-medium">Total with Fees:</span>
-                        <span className="font-bold text-gray-900">฿{result.total_with_vat_and_fees}</span>
+                        <span className="font-bold text-gray-900 font-numeric">฿{result.total_with_vat_and_fees}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Installment Amount:</span>
-                        <span className="font-medium">฿{result.installment_left_to_pay}</span>
+                        <span className="font-medium font-numeric">฿{result.installment_left_to_pay}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Interest per Month ({formData.interestPerMonth}%):</span>
-                        <span className="font-medium">฿{result.interest_per_month}</span>
+                        <span className="font-medium font-numeric">฿{result.interest_per_month}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Interest:</span>
-                        <span className="font-medium">฿{result.total_interest}</span>
+                        <span className="font-medium font-numeric">฿{result.total_interest}</span>
                       </div>
                       <div className="flex justify-between border-t pt-2">
                         <span className="text-gray-800 font-medium">Total Payable:</span>
-                        <span className="font-bold text-gray-900">฿{result.total_to_pay}</span>
+                        <span className="font-bold text-gray-900 font-numeric">฿{result.total_to_pay}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Final Summary */}
                   <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 sm:p-6 rounded-lg border border-green-200">
-                    <div className="text-2xl sm:text-3xl font-bold text-green-900 mb-2">฿{result.total_customer_payment}</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-green-900 mb-2 font-numeric">฿{result.total_customer_payment}</div>
                     <div className="text-base sm:text-lg font-semibold text-green-700">Total Customer Payment</div>
                     <div className="text-sm text-green-600 mt-1">Down payment + All installments</div>
                   </div>
@@ -402,9 +407,9 @@ export default function InstallmentCalculatorPage() {
                   <div className="bg-yellow-50 p-4 sm:p-6 rounded-lg border border-yellow-200">
                     <h4 className="text-lg font-semibold text-yellow-800 mb-2">Payment Summary</h4>
                     <div className="text-sm text-yellow-700 space-y-1">
-                      <div>• Pay <strong>฿{result.down_payment}</strong> immediately</div>
-                      <div>• Then pay <strong>฿{result.monthly_installment}</strong> for <strong>{formData.installmentMonths} months</strong></div>
-                      <div>• Total interest: <strong>฿{result.total_interest}</strong></div>
+                      <div>• Pay <strong className="font-numeric">฿{result.down_payment}</strong> immediately</div>
+                      <div>• Then pay <strong className="font-numeric">฿{result.monthly_installment}</strong> for <strong className="font-numeric">{formData.installmentMonths} months</strong></div>
+                      <div>• Total interest: <strong className="font-numeric">฿{result.total_interest}</strong></div>
                     </div>
                   </div>
                 </div>

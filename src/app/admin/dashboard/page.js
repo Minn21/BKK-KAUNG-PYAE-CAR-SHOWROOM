@@ -503,6 +503,9 @@ export default function AdminDashboard() {
             <Link href="/admin/installment-analysis" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
               Installment Analysis
             </Link>
+            <Link href="/admin/money-manager" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
+              Money Manager
+            </Link>
           </div>
         </div>
       </nav>
@@ -560,7 +563,7 @@ export default function AdminDashboard() {
                 <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
                   {cars.map((car, index) => (
                     <tr key={car.id} className="hover:bg-black/30 backdrop-blur-2xl">
-                      <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base font-medium text-white cursor-pointer" onClick={() => window.location.href = `/admin/car-details/${car.id}`}>
+                      <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base font-medium text-white cursor-pointer font-numeric" onClick={() => window.location.href = `/admin/car-details/${car.id}`}>
                         {index + 1}
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white cursor-pointer" onClick={() => window.location.href = `/admin/car-details/${car.id}`}>
@@ -584,7 +587,7 @@ export default function AdminDashboard() {
                       <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white cursor-pointer" onClick={() => window.location.href = `/admin/car-details/${car.id}`}>
                         {car.gear}
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white cursor-pointer" onClick={() => window.location.href = `/admin/car-details/${car.id}`}>
+                      <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white cursor-pointer font-numeric" onClick={() => window.location.href = `/admin/car-details/${car.id}`}>
                         {car.price}
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">

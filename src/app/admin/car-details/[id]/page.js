@@ -658,7 +658,7 @@ export default function CarDetails() {
                                   </p>
                                 )}
                                 {cost !== undefined && cost !== null && (
-                                  <p className="text-gray-300 text-sm">
+                                  <p className="text-gray-300 text-sm font-numeric">
                                     Cost: ฿{parseFloat(cost).toLocaleString()}
                                   </p>
                                 )}

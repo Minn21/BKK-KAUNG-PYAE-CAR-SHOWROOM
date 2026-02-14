@@ -2,6 +2,24 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
+const toNumber = (value) => {
+  const n = typeof value === "string" ? Number(value.replace(/,/g, "")) : Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const getSoldDate = (car) => {
+  const candidate =
+    car?.soldOutDate ??
+    car?.saleDate ??
+    car?.reportDate ??
+    car?.sale?.date ??
+    car?.sale?.soldDate ??
+    null;
+  if (!candidate) return null;
+  const dt = new Date(candidate);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
 export default function AnalysisPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [profitData, setProfitData] = useState({
@@ -9,7 +27,9 @@ export default function AnalysisPage() {
     sixMonths: [],
     yearly: []
   });
-  const [totalProfit, setTotalProfit] = useState(0);
+  const [totalProfit, setTotalProfit] = useState(0); // gross profit (paid sales)
+  const [totalGeneralExpenses, setTotalGeneralExpenses] = useState(0);
+  const [netProfit, setNetProfit] = useState(0);
   const [carsData, setCarsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -47,38 +67,53 @@ export default function AnalysisPage() {
         // Convert frontend period to backend period format
         const apiPeriod = period === 'sixMonths' ? '6months' : period;
         
-        // Fetch profit analysis from API with period parameter
-        const response = await fetch(`${API_BASE_URL}/api/analysis/profit?period=${apiPeriod}`, {
-          cache: "no-store",
-          headers: headers
-        });
+        // Fetch:
+        // - `/api/analysis/profit` for cars list + per-car profit
+        // - `/api/analysis/profit/net` for gross/expenses/net totals
+        const [profitRes, netRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/analysis/profit?period=${apiPeriod}`, {
+            cache: "no-store",
+            headers: headers
+          }),
+          fetch(`${API_BASE_URL}/api/analysis/profit/net?period=${apiPeriod}`, {
+            cache: "no-store",
+            headers: headers
+          })
+        ]);
         
-        if (!response.ok) {
-          if (response.status === 401) {
+        if (!profitRes.ok || !netRes.ok) {
+          const status = !profitRes.ok ? profitRes.status : netRes.status;
+          if (status === 401) {
             alert("Unauthorized: Please login again.");
             window.location.href = '/admin/login';
             return;
           }
-          if (response.status === 400) {
-            const errorData = await response.json();
+          if (status === 400) {
+            const errorData = await (!profitRes.ok ? profitRes.json() : netRes.json());
             alert(errorData.message || "Invalid period parameter");
             setLoading(false);
             return;
           }
-          throw new Error(`Request failed with status ${response.status}`);
+          throw new Error(`Request failed with status ${status}`);
         }
         
-        const data = await response.json();
+        const [profitJson, netJson] = await Promise.all([profitRes.json(), netRes.json()]);
 
-        console.log('data', data);
+        console.log('profitJson', profitJson);
+        console.log('netJson', netJson);
         
-        if (data.success) {
-          // Set cars data and total profit from API response
-          setCarsData(data.cars || []);
-          setTotalProfit(data.totalProfit || 0);
+        if (profitJson.success) {
+          // Cars list + per-car profit
+          setCarsData(profitJson.cars || []);
+          
+          // Totals from net endpoint (Paid + Installment general profit - expenses)
+          const summary = netJson?.summary || {};
+          setTotalProfit(toNumber(summary.totalGrossProfit)); // gross
+          setTotalGeneralExpenses(toNumber(summary.totalGeneralExpenses));
+          setNetProfit(toNumber(summary.netProfit));
           
           // Group data by period for display
-          const groupedData = groupDataByPeriod(data.cars || [], apiPeriod);
+          const groupedData = groupDataByPeriod(profitJson.cars || [], apiPeriod);
           const stateKey = period === 'sixMonths' ? 'sixMonths' : period;
           
           setProfitData(prev => ({
@@ -105,8 +140,8 @@ export default function AnalysisPage() {
     const grouped = {};
 
     cars.forEach(car => {
-      const soldDate = new Date(car.soldOutDate);
-      if (isNaN(soldDate.getTime())) return;
+      const soldDate = getSoldDate(car);
+      if (!soldDate) return;
 
       let key;
       if (period === 'monthly') {
@@ -128,7 +163,7 @@ export default function AnalysisPage() {
         };
       }
 
-      grouped[key].profit += car.profit || 0;
+      grouped[key].profit += toNumber(car?.profit);
       grouped[key].soldCars += 1;
       grouped[key].totalCars += 1;
     });
@@ -196,6 +231,9 @@ export default function AnalysisPage() {
     return totalProfit;
   };
 
+  const getTotalExpenses = () => totalGeneralExpenses;
+  const getNetProfit = () => netProfit;
+
   // Calculate total cars for current period (from API response)
   const getTotalCars = () => {
     return carsData.length;
@@ -203,7 +241,7 @@ export default function AnalysisPage() {
 
   // Calculate total sales (from API response)
   const getTotalSales = () => {
-    return carsData.reduce((total, car) => total + (car.soldPrice || 0), 0);
+    return carsData.reduce((total, car) => total + toNumber(car?.soldPrice ?? car?.salePrice ?? car?.priceToSell), 0);
   };
 
   // Export to CSV (Excel compatible)
@@ -227,7 +265,9 @@ export default function AnalysisPage() {
       
       // Summary Section
       csvContent += `SUMMARY\n`;
-      csvContent += `Total Profit,฿${getTotalProfit().toLocaleString()}\n`;
+      csvContent += `Gross Profit (Paid),฿${getTotalProfit().toLocaleString()}\n`;
+      csvContent += `General Expenses,฿${getTotalExpenses().toLocaleString()}\n`;
+      csvContent += `Net Profit,฿${getNetProfit().toLocaleString()}\n`;
       csvContent += `Total Sold Cars,${getTotalCars()}\n`;
       csvContent += `Total Sales,฿${getTotalSales().toLocaleString()}\n`;
       csvContent += `Average Profit per Car,฿${getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}\n`;
@@ -251,8 +291,8 @@ export default function AnalysisPage() {
       csvContent += `No.,License No.,Brand,Purchase Price (฿),Sold Price (฿),Total Repairs (฿),Profit (฿),Sold Date\n`;
       
       carsData.forEach((car, index) => {
-        const soldDate = car.soldOutDate ? new Date(car.soldOutDate).toLocaleDateString('en-GB') : 'N/A';
-        csvContent += `${index + 1},${car.licenseNo || 'N/A'},${car.brand || 'N/A'},฿${(car.purchasePrice || 0).toLocaleString()},฿${(car.soldPrice || 0).toLocaleString()},฿${(car.totalRepairs || 0).toLocaleString()},฿${(car.profit || 0).toLocaleString()},${soldDate}\n`;
+        const soldDate = getSoldDate(car)?.toLocaleDateString('en-GB') || 'N/A';
+        csvContent += `${index + 1},${car.licenseNo || 'N/A'},${car.brand || 'N/A'},฿${toNumber(car.purchasePrice).toLocaleString()},฿${toNumber(car.soldPrice).toLocaleString()},฿${toNumber(car.totalRepairs).toLocaleString()},฿${toNumber(car.profit).toLocaleString()},${soldDate}\n`;
       });
       
       // Create and download file
@@ -439,8 +479,11 @@ export default function AnalysisPage() {
             <h3 style="margin-top: 0;">Executive Summary</h3>
             <div class="summary-grid">
               <div class="summary-item">
-                <div class="summary-label">Total Profit</div>
-                <div class="summary-value">฿${getTotalProfit().toLocaleString()}</div>
+                <div class="summary-label">Net Profit</div>
+                <div class="summary-value">฿${getNetProfit().toLocaleString()}</div>
+                <div style="margin-top: 6px; font-size: 11px; color: #666;">
+                  Gross: ฿${getTotalProfit().toLocaleString()} | Expenses: ฿${getTotalExpenses().toLocaleString()}
+                </div>
               </div>
               <div class="summary-item">
                 <div class="summary-label">Total Sold Cars</div>
@@ -588,6 +631,9 @@ export default function AnalysisPage() {
             <Link href="/admin/installment-analysis" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
               Installment Analysis
             </Link>
+            <Link href="/admin/money-manager" className="flex items-center px-2 sm:px-3 py-2 text-sm sm:text-base font-medium text-white hover:text-red-500 hover:border-red-500 border-b-2 border-transparent whitespace-nowrap flex-shrink-0">
+              Money Manager
+            </Link>
           </div>
         </div>
       </nav>
@@ -677,8 +723,12 @@ export default function AnalysisPage() {
                   </div>
                 </div>
                 <div className="ml-3 sm:ml-4">
-                  <div className="text-sm sm:text-base font-medium text-gray-300">Total Profit</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalProfit().toLocaleString()}</div>
+                  <div className="text-sm sm:text-base font-medium text-gray-300">Net Profit</div>
+                  <div className="text-2xl sm:text-3xl font-semibold text-white font-numeric">฿{getNetProfit().toLocaleString()}</div>
+                  <div className="text-xs sm:text-sm text-gray-400 mt-2">
+                    Gross: <span className="font-numeric text-white">฿{getTotalProfit().toLocaleString()}</span>{" "}
+                    | Expenses: <span className="font-numeric text-white">฿{getTotalExpenses().toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -694,7 +744,7 @@ export default function AnalysisPage() {
                 </div>
                 <div className="ml-3 sm:ml-4">
                   <div className="text-sm sm:text-base font-medium text-gray-300">Sold Cars</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">{getTotalCars()}</div>
+                  <div className="text-2xl sm:text-3xl font-semibold text-white font-numeric">{getTotalCars()}</div>
                 </div>
               </div>
             </div>
@@ -710,7 +760,7 @@ export default function AnalysisPage() {
                 </div>
                 <div className="ml-3 sm:ml-4">
                   <div className="text-sm sm:text-base font-medium text-gray-300">Avg Profit/Car</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">
+                  <div className="text-2xl sm:text-3xl font-semibold text-white font-numeric">
                     ฿{getTotalCars() > 0 ? (getTotalProfit() / getTotalCars()).toLocaleString() : '0'}
                   </div>
                 </div>
@@ -728,43 +778,45 @@ export default function AnalysisPage() {
                 </div>
                 <div className="ml-3 sm:ml-4">
                   <div className="text-sm sm:text-base font-medium text-gray-300">Total Sales</div>
-                  <div className="text-2xl sm:text-3xl font-semibold text-white">฿{getTotalSales().toLocaleString()}</div>
+                  <div className="text-2xl sm:text-3xl font-semibold text-white font-numeric">฿{getTotalSales().toLocaleString()}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Profit Chart */}
-          <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow mb-6 sm:mb-8">
-            <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
-              Profit Trend - {selectedPeriod === 'monthly' ? 'Last 12 Months' : selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years'}
-            </h3>
-            <div className="h-64 sm:h-80 bg-gray-900/50 rounded-lg p-4">
-              <div className="flex items-end justify-between h-full space-x-2">
-                {getCurrentData().map((item, index) => {
-                  const maxProfit = Math.max(...getCurrentData().map(d => d.profit));
-                  const height = maxProfit > 0 ? (item.profit / maxProfit) * 100 : 0;
-                  const period = selectedPeriod === 'yearly' ? item.year : item.month;
-                  
-                  return (
-                    <div key={index} className="flex flex-col items-center flex-1">
-                      <div className="text-xs sm:text-sm text-gray-300 mb-2 text-center">
-                        {selectedPeriod === 'yearly' ? period : period.split('-')[1]}
+          {/* Profit Chart (hide for Monthly) */}
+          {selectedPeriod !== 'monthly' && (
+            <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow mb-6 sm:mb-8">
+              <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
+                Profit Trend - {selectedPeriod === 'sixMonths' ? 'Last 6 Months' : 'Last 5 Years'}
+              </h3>
+              <div className="h-64 sm:h-80 bg-gray-900/50 rounded-lg p-4">
+                <div className="flex items-end justify-between h-full space-x-2">
+                  {getCurrentData().map((item, index) => {
+                    const maxProfit = Math.max(...getCurrentData().map(d => d.profit));
+                    const height = maxProfit > 0 ? (item.profit / maxProfit) * 100 : 0;
+                    const period = selectedPeriod === 'yearly' ? item.year : item.month;
+                    
+                    return (
+                      <div key={index} className="flex flex-col items-center flex-1">
+                        <div className="text-xs sm:text-sm text-gray-300 mb-2 text-center">
+                          {selectedPeriod === 'yearly' ? period : period.split('-')[1]}
+                        </div>
+                        <div 
+                          className="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-500 hover:from-red-500 hover:to-red-300"
+                          style={{ height: `${Math.max(height, 5)}%` }}
+                          title={`${period}: ฿${item.profit.toLocaleString()}`}
+                        ></div>
+                        <div className="text-xs text-gray-400 mt-2 text-center font-numeric">
+                          ฿{item.profit > 1000 ? `${(item.profit/1000).toFixed(1)}k` : item.profit.toFixed(0)}
+                        </div>
                       </div>
-                      <div 
-                        className="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-500 hover:from-red-500 hover:to-red-300"
-                        style={{ height: `${Math.max(height, 5)}%` }}
-                        title={`${period}: ฿${item.profit.toLocaleString()}`}
-                      ></div>
-                      <div className="text-xs text-gray-400 mt-2 text-center">
-                        ฿{item.profit > 1000 ? `${(item.profit/1000).toFixed(1)}k` : item.profit.toFixed(0)}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Profit Breakdown */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-6 sm:mb-8">

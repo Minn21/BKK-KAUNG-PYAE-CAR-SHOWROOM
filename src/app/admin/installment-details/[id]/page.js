@@ -424,13 +424,13 @@ export default function InstallmentDetails() {
                                   {isPaid ? 'Paid' : 'Pending'}
                                 </span>
                             </div>
-                            <p className="text-white text-base font-semibold mb-1">
+                            <p className="text-white text-base font-semibold mb-1 font-numeric">
                               ฿{paymentAmount.toLocaleString()}
                             </p>
                             {penaltyFee > 0 && (
                               <div className="mb-2">
                                 <p className="text-xs text-gray-400">Penalty Fee</p>
-                                <p className="text-red-400 text-sm font-semibold">
+                                <p className="text-red-400 text-sm font-semibold font-numeric">
                                   +฿{penaltyFee.toLocaleString()}
                                 </p>
                               </div>
@@ -438,7 +438,7 @@ export default function InstallmentDetails() {
                             {penaltyFee > 0 && (
                               <div className="pt-2 border-t border-gray-600">
                                 <p className="text-xs text-gray-400">Total Paid</p>
-                                <p className="text-green-400 text-lg font-bold">
+                                <p className="text-green-400 text-lg font-bold font-numeric">
                                   ฿{totalAmount.toLocaleString()}
                                 </p>
                               </div>
@@ -457,13 +457,13 @@ export default function InstallmentDetails() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="text-center">
                       <p className="text-sm text-gray-300">Monthly Payment</p>
-                      <p className="text-white text-lg font-bold">
+                      <p className="text-white text-lg font-bold font-numeric">
                         ฿{(paymentSummary?.monthlyPayment || parseInt(installment.monthlyPayment) || 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm text-gray-300">Payments Made</p>
-                      <p className="text-white text-lg font-bold">
+                      <p className="text-white text-lg font-bold font-numeric">
                         {paymentSummary?.paymentsMade || paidMonths.size} / {installment.installmentPeriod || 0}
                       </p>
                     </div>
@@ -525,17 +525,17 @@ export default function InstallmentDetails() {
                         return (
                           <tr key={index} className="hover:bg-black/30">
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-white">{formattedDate}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-white font-semibold">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-white font-semibold font-numeric">
                               ฿{amount.toLocaleString()}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold font-numeric">
                               {penaltyFee > 0 ? (
                                 <span className="text-red-400">฿{penaltyFee.toLocaleString()}</span>
                               ) : (
                                 <span className="text-gray-500">-</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-green-400 font-bold">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-green-400 font-bold font-numeric">
                               ฿{total.toLocaleString()}
                             </td>
                           </tr>

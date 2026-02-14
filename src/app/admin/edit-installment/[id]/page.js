@@ -1072,7 +1072,7 @@ export default function EditInstallment() {
                                       <div className="mt-2 pt-2 border-t border-red-400/30">
                                         <div className="flex justify-between items-center text-xs">
                                           <span className="text-gray-400">Total with Penalty:</span>
-                                          <span className="text-red-300 font-bold">
+                                          <span className="text-red-300 font-bold font-numeric">
                                             ฿{((parseInt(formData.monthlyPayment) || 0) + (penaltyFees[monthNumber] || 0)).toLocaleString()}
                                           </span>
                                         </div>

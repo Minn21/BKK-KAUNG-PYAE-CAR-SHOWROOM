@@ -661,37 +661,38 @@ export default function InstallmentAnalysis() {
                 </div>
               </div>
 
-              {/* Profit Chart */}
-              <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow mb-6 sm:mb-8">
-                <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
-                  Profit Trend -{" "}
-                  {selectedPeriod === "monthly" ? "Last 12 Months" : selectedPeriod === "sixMonths" ? "Last 6 Months" : "Last 5 Years"}
-                </h3>
-                <div className="h-64 sm:h-80 bg-gray-900/50 rounded-lg p-4">
-                  <div className="flex items-end justify-between h-full space-x-2">
-                    {currentData.map((item, idx) => {
-                      const maxProfit = Math.max(...currentData.map((d) => d.profit));
-                      const height = maxProfit > 0 ? (item.profit / maxProfit) * 100 : 0;
-                      const period = selectedPeriod === "yearly" ? item.year : item.month;
-                      return (
-                        <div key={idx} className="flex flex-col items-center flex-1">
-                          <div className="text-xs sm:text-sm text-gray-300 mb-2 text-center">
-                            {selectedPeriod === "yearly" ? period : period.split("-")[1]}
+              {/* Profit Chart (hide for Monthly) */}
+              {selectedPeriod !== "monthly" && (
+                <div className="bg-black/20 backdrop-blur-2xl p-4 sm:p-6 rounded-lg shadow mb-6 sm:mb-8">
+                  <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4 sm:mb-6">
+                    Profit Trend - {selectedPeriod === "sixMonths" ? "Last 6 Months" : "Last 5 Years"}
+                  </h3>
+                  <div className="h-64 sm:h-80 bg-gray-900/50 rounded-lg p-4">
+                    <div className="flex items-end justify-between h-full space-x-2">
+                      {currentData.map((item, idx) => {
+                        const maxProfit = Math.max(...currentData.map((d) => d.profit));
+                        const height = maxProfit > 0 ? (item.profit / maxProfit) * 100 : 0;
+                        const period = selectedPeriod === "yearly" ? item.year : item.month;
+                        return (
+                          <div key={idx} className="flex flex-col items-center flex-1">
+                            <div className="text-xs sm:text-sm text-gray-300 mb-2 text-center">
+                              {selectedPeriod === "yearly" ? period : period.split("-")[1]}
+                            </div>
+                            <div
+                              className="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-500 hover:from-red-500 hover:to-red-300"
+                              style={{ height: `${Math.max(height, 5)}%` }}
+                              title={`${period}: ฿${item.profit.toLocaleString()}`}
+                            />
+                            <div className="text-xs text-gray-400 mt-2 text-center font-numeric">
+                              ฿{toNumber(item.profit) > 1000 ? `${(toNumber(item.profit) / 1000).toFixed(1)}k` : toNumber(item.profit).toFixed(0)}
+                            </div>
                           </div>
-                          <div
-                            className="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-500 hover:from-red-500 hover:to-red-300"
-                            style={{ height: `${Math.max(height, 5)}%` }}
-                            title={`${period}: ฿${item.profit.toLocaleString()}`}
-                          />
-                          <div className="text-xs text-gray-400 mt-2 text-center font-numeric">
-                            ฿{toNumber(item.profit) > 1000 ? `${(toNumber(item.profit) / 1000).toFixed(1)}k` : toNumber(item.profit).toFixed(0)}
-            </div>
-            </div>
-                      );
-                    })}
-            </div>
-            </div>
-          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Period Breakdown Table */}
           <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md mb-6 sm:mb-8">
@@ -736,55 +737,57 @@ export default function InstallmentAnalysis() {
             </div>
           </div>
 
-              {/* Car Details Table */}
-          <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md">
-            <div className="px-4 sm:px-6 py-4 sm:py-6">
-                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Car Details</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-600">
-                  <thead className="bg-black/20 backdrop-blur-2xl">
-                    <tr>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">No</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">License No</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Brand</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Purchase</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Sold</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Total</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Repairs</th>
-                          <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Profit</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
-                        {(carsData || []).length === 0 ? (
+              {/* Car Details Table (hide for Yearly) */}
+              {selectedPeriod !== "yearly" && (
+                <div className="bg-black/20 backdrop-blur-2xl shadow overflow-hidden sm:rounded-md">
+                  <div className="px-4 sm:px-6 py-4 sm:py-6">
+                    <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Car Details</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-600">
+                        <thead className="bg-black/20 backdrop-blur-2xl">
                           <tr>
-                            <td colSpan={8} className="px-3 sm:px-6 py-6 text-center text-white">
-                              No cars in this period
-                      </td>
-                    </tr>
-                        ) : (
-                          (carsData || []).map((car, idx) => {
-                            const detailed = toNumber(car?.actualInstallmentProfit);
-                            return (
-                              <tr key={car?.id || car?._id || idx} className="hover:bg-black/30 backdrop-blur-2xl">
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{idx + 1}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{car?.licenseNo || "N/A"}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{car?.brand || "N/A"}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.purchasePrice).toLocaleString()}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.soldPrice).toLocaleString()}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.totalSales).toLocaleString()}</td>
-                                <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.totalRepairs).toLocaleString()}</td>
-                                <td className={`px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base font-semibold ${detailed >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                  ฿{detailed.toLocaleString()}
-                                </td>
-                    </tr>
-                            );
-                          })
-                        )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">No</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">License No</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Brand</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Purchase</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Sold</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Total</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Repairs</th>
+                            <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-sm sm:text-base font-bold text-white uppercase tracking-wider">Profit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-black/10 backdrop-blur-2xl divide-y divide-gray-600">
+                          {(carsData || []).length === 0 ? (
+                            <tr>
+                              <td colSpan={8} className="px-3 sm:px-6 py-6 text-center text-white">
+                                No cars in this period
+                              </td>
+                            </tr>
+                          ) : (
+                            (carsData || []).map((car, idx) => {
+                              const detailed = toNumber(car?.actualInstallmentProfit);
+                              return (
+                                <tr key={car?.id || car?._id || idx} className="hover:bg-black/30 backdrop-blur-2xl">
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{idx + 1}</td>
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{car?.licenseNo || "N/A"}</td>
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white">{car?.brand || "N/A"}</td>
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.purchasePrice).toLocaleString()}</td>
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.soldPrice).toLocaleString()}</td>
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.totalSales).toLocaleString()}</td>
+                                  <td className="px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base text-white font-numeric">฿{toNumber(car?.totalRepairs).toLocaleString()}</td>
+                                  <td className={`px-3 sm:px-6 py-3 sm:py-5 whitespace-nowrap text-sm sm:text-base font-semibold ${detailed >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                    ฿{detailed.toLocaleString()}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
